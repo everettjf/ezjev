@@ -12,7 +12,7 @@ cd "$(dirname "$0")"
 export PATH="$HOME/.local/bin:$PATH"
 HF_TOKEN="$(hf auth token 2>/dev/null)" || { echo "先运行 hf auth login"; exit 1; }
 export HF_TOKEN
-USER_NAME="$(hf auth whoami | head -n1 | sed 's/^user: *//; s/^ *//')"
+USER_NAME="$(hf auth whoami | head -n1 | sed 's/^user[:=] *//; s/ .*//')"
 SUITE_REPO="${SUITE_REPO:-$USER_NAME/decision-index-suite-0.2}"
 RESULTS_REPO="${RESULTS_REPO:-$USER_NAME/decision-index-results}"
 QUICK_REPO="$USER_NAME/ezjev-0.8b-quick"
