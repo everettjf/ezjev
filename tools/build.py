@@ -476,13 +476,17 @@ SUITE_REPO   = os.environ["SUITE_REPO"]
 DATA_VERSION = int(os.environ.get("DATA_VERSION", "2"))
 DATA_SCALE   = float(os.environ.get("DATA_SCALE", "1.0"))
 SEED         = int(os.environ.get("SEED", "0"))
+DATA_ONLY    = os.environ.get("DATA_ONLY")   # 例如 "phish:3000,hover_like:2500"：只构造这些数据源
 WORK         = "/tmp/ezjev"
 os.makedirs(WORK, exist_ok=True)
 print(f"DATA_VERSION={DATA_VERSION} DATA_SCALE={DATA_SCALE} -> {DATA_REPO}/{DATA_NAME}", flush=True)
 '''
 
 DATA_MAIN = '''
-rows = build(SIZES_V2 if DATA_VERSION >= 2 else SIZES, f"{WORK}/all.jsonl.gz")
+sizes = SIZES_V2 if DATA_VERSION >= 2 else SIZES
+if DATA_ONLY:
+    sizes = {k: int(v) for k, v in (x.split(":") for x in DATA_ONLY.split(","))}
+rows = build(sizes, f"{WORK}/all.jsonl.gz")
 rows, dropped = decontaminate(rows, SUITE_REPO)
 n_dev = min(1500, max(50, len(rows) // 30))
 stats = {"data_version": DATA_VERSION, "data_scale": DATA_SCALE, "seed": SEED, "rows": len(rows), "dev": n_dev,

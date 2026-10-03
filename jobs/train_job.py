@@ -788,6 +788,95 @@ def newyorker(n):
                           choice("Which caption was written for this cartoon?", dict(zip(keys, ch))), ex["label"]))
     return out
 
+# ---------- 第二阶段补充：PhishNChips、HoVer 风格 ----------
+PHISH_Q = {
+    "verdict": choice("This email arrived in the user's inbox and contains a link (`link_url`). Is it a phishing attempt, or a legitimate "
+                      "message whose link is safe to click?",
+                      {"phishing": "The email or its link is a phishing attempt or otherwise malicious. The user should not click the link.",
+                       "legitimate": "A normal, legitimate message. The link is safe to click."}),
+    "is_phishing": noul("This email is a phishing attempt and the user should not click the link in `link_url`.",
+                        "The email or its link is a phishing attempt or otherwise malicious.",
+                        "The email is a normal, legitimate message and the link is safe to click."),
+    "verdict_alt_click": choice("Should the user click the link in this email?",
+                                {"do_not_click": "No. The link may be phishing or malicious.", "click": "Yes. The email and its link look legitimate."}),
+    "verdict_alt_minimal": choice("Classify this email.", {"phishing": None, "legitimate": None}),
+}
+FIRST = ["Sarah", "Daniel", "Priya", "Tom", "Mei", "Carlos", "Anna", "James", "Fatima", "Lukas", "Grace", "Omar"]
+LAST = ["Jenkins", "Morrison", "Patel", "Nguyen", "Garcia", "Schmidt", "Okafor", "Kim", "Rossi", "Silva", "Brown", "Cohen"]
+SUBJ = [("Meeting notes - {p}", "I've compiled the notes from our {p} meeting. You can access them here: {u}. Let me know if anything is missing."),
+        ("Updated schedule for {p}", "The updated schedule for {p} is posted. Please review it when you have a moment: {u}"),
+        ("Invoice #{n} for {p}", "Please find the invoice for {p} at the link below.\n\n{u}\n\nThanks for your business."),
+        ("Shared document: {p} plan", "I've shared the {p} plan with you. Open it here: {u}"),
+        ("Quick question about {p}", "Following up on {p}. The reference material is here: {u}. Happy to discuss on our next call.")]
+LURE = ["Your account will be suspended within 24 hours unless you verify your details.", "Unusual sign-in activity was detected. Confirm your identity now.",
+        "Your mailbox is almost full. Sign in to keep receiving email.", "Action required: your password expires today."]
+PROJ = ["Project Alpha", "the Q3 review", "the vendor onboarding", "the offsite", "the client renewal", "the audit", "the product launch"]
+
+def _host(u):
+    u = re.sub(r"^\w+://", "", u)
+    return u.split("/")[0].split("?")[0].lower()
+
+def phish(n):
+    """PhishNChips 风格：真实的钓鱼 / 正常 URL（ealvaradob/phishing-dataset）放进模板生成的工作邮件。
+    正常邮件里也会有第三方链接、"查看文档" 之类的话；钓鱼邮件有一半写得很平常，模型要看链接本身。"""
+    urls = json.load(open(fetch("https://huggingface.co/datasets/ealvaradob/phishing-dataset/resolve/main/urls.json", "phish_urls.json")))
+    good = [u["text"] for u in urls if u["label"] == 0 and "." in _host(u["text"])]
+    bad = [u["text"] for u in urls if u["label"] == 1 and "." in _host(u["text"])]
+    out = []
+    for i in range(n):
+        is_ph = i % 2 == 0
+        u = R.choice(bad if is_ph else good)
+        u = u if re.match(r"^\w+://", u) else R.choice(["http://", "https://"]) + u
+        first, last = R.choice(FIRST), R.choice(LAST)
+        host = _host(u)
+        org = host.split(".")[-2] if host.count(".") >= 1 else host
+        r = R.random()
+        if r < 0.5:
+            frm = f"{first.lower()}.{last.lower()}@{host.replace('www.', '')}"
+        elif r < 0.75:
+            frm = f"{first.lower()}.{last.lower()}@{R.choice(['northwind', 'evergreenpartners', 'acmecorp', 'bluepeak', 'meridian'])}.com"
+        else:
+            frm = f"{R.choice(['support', 'it.helpdesk', 'billing', first.lower()])}{R.randint(1, 99)}@{R.choice(['gmail.com', 'outlook.com', 'yahoo.com'])}"
+        subj, body = R.choice(SUBJ)
+        p = R.choice(PROJ)
+        text = body.format(p=p, u=u)
+        if is_ph and R.random() < 0.5:
+            text = R.choice(LURE) + "\n\n" + text
+        state = {"sender": f"{first} {last}", "from": frm, "subject": subj.format(p=p, n=R.randint(1000, 9999)),
+                 "body": f"Hi {R.choice(['Team', 'Alex', 'Drew', 'all'])},\n\n{text}\n\nBest,\n{first} {last}",
+                 "link_display_text": R.choice(["access them here", "View document", "Open", u]), "link_url": u}
+        gold = {"verdict": "phishing" if is_ph else "legitimate", "is_phishing": is_ph,
+                "verdict_alt_click": "do_not_click" if is_ph else "click", "verdict_alt_minimal": "phishing" if is_ph else "legitimate"}
+        keys = R.sample(list(PHISH_Q), R.randint(1, 3))
+        out.append(multi("phish_gen", state, {k: PHISH_Q[k] for k in keys}, {k: gold[k] for k in keys}))
+    return out
+
+def hover_like(n):
+    """HoVer 风格：HotpotQA train 的问题 + 答案写成一句说法，配上支撑段落；答案换成别的实体就是不被支持。"""
+    crit = {"SUPPORTED": "The evidence supports the claim.", "NOT_SUPPORTED": "The evidence does not support the claim."}
+    out = []
+    for ex in stream("hotpotqa/hotpot_qa", "distractor", n=n * 2, buffer=5000):
+        titles, sents = ex["context"]["title"], ex["context"]["sentences"]
+        sup = [t for t in dict.fromkeys(ex["supporting_facts"]["title"]) if t in titles]
+        if ex["answer"].lower() in ("yes", "no") or len(sup) < 2:
+            continue
+        ev = [{"title": t, "text": "".join(sents[titles.index(t)])} for t in sup]
+        ok = R.random() < 0.5
+        ans = ex["answer"]
+        if not ok:
+            others = [t for t in titles if t not in sup and t.lower() != ans.lower()]
+            if not others:
+                continue
+            ans = R.choice(others)
+        claim = f"The answer to \"{ex['question'].rstrip('?')}?\" is {ans}."
+        out.append(sample("hover_like", {"claim": claim, "evidence": ev}, choice("Is the claim supported by the evidence?", crit),
+                          "SUPPORTED" if ok else "NOT_SUPPORTED"))
+        if len(out) >= n:
+            break
+    return out
+
+SOURCES.update({"phish": phish, "hover_like": hover_like})
+
 SOURCES.update({
     "contractnli": contractnli, "vast": vast, "nli4ct": nli4ct, "ragtruth": ragtruth, "isarcasm": isarcasm, "acos": acos,
     "sharc": legal_rules, "esci": esci, "qnli": qnli, "sgd": sgd, "tool_rows": tool_rows, "when2call": when2call,

@@ -31,7 +31,7 @@ case "${1:-}" in
                    -e HF_REPO="$QUICK_REPO" -e SUITE_REPO="$SUITE_REPO" -e RESULTS_REPO="$RESULTS_REPO" -e PER_BENCH=20 eval_job.py ;;
   data)        v="${2:?v1 或 v2}"
                run --flavor cpu-upgrade --timeout 4h --name "ezjev-data-$v" -e DATA_REPO="$DATA_REPO" -e DATA_NAME="$v" \
-                   -e DATA_VERSION="${v#v}" -e SUITE_REPO="$SUITE_REPO" data_job.py ;;
+                   -e DATA_VERSION="${v//[^0-9]/}" -e SUITE_REPO="$SUITE_REPO" ${DATA_ONLY:+-e DATA_ONLY="$DATA_ONLY"} data_job.py ;;
   ab)          v="${2:?v1 或 v2}"
                run --flavor a100-large --timeout 6h --name "ezjev-ab-$v" -e HF_REPO="$USER_NAME/ezjev-0.8b-$v" \
                    -e BASE_MODEL=Qwen/Qwen3.5-0.8B -e DATA_REPO="$DATA_REPO" -e DATA_NAME="$v" -e MAX_LEN=16384 train_job.py ;;
