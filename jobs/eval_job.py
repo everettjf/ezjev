@@ -99,7 +99,10 @@ cfg = json.load(open(hf_hub_download(HF_REPO, "ezjev.json")))
 T = cfg["temperature"]
 vllm = subprocess.Popen([str(BIN / "vllm"), "serve", HF_REPO, "--port", "8000", "--max-logprobs", "256",
                          "--return-tokens-as-token-ids", "--max-model-len", str(MAX_MODEL_LEN),
-                         "--gpu-memory-utilization", "0.90"])
+                         "--gpu-memory-utilization", "0.90",
+                         # 镜像里没有 nvcc：避开需要 JIT 编译的 FlashInfer 采样器和 GDN prefill kernel
+                         "--additional-config", json.dumps({"gdn_prefill_backend": "triton"})],
+                        env={**os.environ, "VLLM_USE_FLASHINFER_SAMPLER": "0"})
 wait("http://127.0.0.1:8000/health", "vLLM", vllm)
 jev = subprocess.Popen([sys.executable, "-m", "llm2jev", "--model", HF_REPO, "--backend", "vllm",
                         "--url", "http://127.0.0.1:8000", "--port", "8080", "--temperature", str(T)])
