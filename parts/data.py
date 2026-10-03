@@ -15,8 +15,16 @@ def noul(instr, yes=None, no=None):
         q["criteria"] = {"true": yes or "Yes", "false": no or "No"}
     return q
 
+def yn(instr, yes="Yes", no="No"):
+    """评测集里大量 yes/no 判断写成 choice（key 是 yes/no），不是 noul。"""
+    return choice(instr, {"yes": yes, "no": no})
+
 def sample(src, state, q, gold):
     return {"src": src, "state": state, "questions": {"q": q}, "expected": {"q": gold}}
+
+def multi(src, state, qs, golds):
+    """一个 state 配多个问题（ContractNLI、BFCL、ToolRet 这类评测题就是这样）。"""
+    return {"src": src, "state": state, "questions": qs, "expected": golds}
 
 def stream(name, cfg=None, split="train", n=1000, buffer=20000):
     """流式读取并随机抽 n 条（不必下载整个数据集）。"""
@@ -30,11 +38,15 @@ def mc(src, state, instr, options, gold_idx):
     opts = [options[i] for i in order]
     gold = order.index(gold_idx)
     style = R.random()
-    if style < 0.4 and len(opts) <= 26:
+    cut = (0.3, 0.45, 0.75) if DATA_VERSION >= 2 else (0.4, 0.7, 0.7)
+    if style < cut[0] and len(opts) <= 26:
         keys = [chr(65 + i) for i in range(len(opts))]
         crit = dict(zip(keys, opts))
-    elif style < 0.7:
+    elif style < cut[1]:
         keys = [str(i + 1) for i in range(len(opts))]
+        crit = dict(zip(keys, opts))
+    elif style < cut[2]:  # option_0、option_1……（GSM8K、CRUXEval、API-Bank、Habermas 等评测题的写法）
+        keys = [f"option_{i}" for i in range(len(opts))]
         crit = dict(zip(keys, opts))
     else:
         keys = [o.strip()[:200] for o in opts]
@@ -50,6 +62,10 @@ def labelset(src, text, instr, names, gold_name, desc=None):
     names = list(names)
     if R.random() < 0.5:
         R.shuffle(names)
+    if DATA_VERSION >= 2 and R.random() < 0.35:  # BANKING77、CLINC 评测题：key 是 option_i，类名放在描述里
+        keys = [f"option_{i}" for i in range(len(names))]
+        crit = {k: (f"{n}: {desc[n]}" if desc and desc.get(n) else n) for k, n in zip(keys, names)}
+        return sample(src, text, choice(instr, crit), keys[names.index(gold_name)])
     if desc or R.random() < 0.6:
         crit = {n: (desc.get(n) if desc else None) for n in names}
     else:
@@ -361,6 +377,20 @@ SOURCES = {
     "hh":         hh,
 }
 
+def inline_state(row):
+    """把短 state 并进题目说明、state 置空（ANLI、WinoGrande、HellaSwag、VAST、CLadder 等评测题就是这种写法）。"""
+    st, (qid, q), = row["state"], *row["questions"].items()
+    if not isinstance(q.get("instructions"), str):
+        return row
+    if isinstance(st, str) and 0 < len(st) < 3000:
+        body = st
+    elif isinstance(st, dict) and st and all(isinstance(v, str) for v in st.values()) and sum(map(len, st.values())) < 3000:
+        body = "\n".join(f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in st.items())
+    else:
+        return row
+    q = {**q, "instructions": q["instructions"] + "\n" + body}
+    return {**row, "state": R.choice(({}, "")), "questions": {qid: q}}
+
 def build(sizes, path):
     rows = []
     for name, n in sizes.items():
@@ -370,6 +400,8 @@ def build(sizes, path):
         except Exception as e:  # 某个数据源挂了不影响整体
             print(f"[skip] {name}: {type(e).__name__}: {str(e)[:200]}", flush=True)
             continue
+        if DATA_VERSION >= 2:
+            got = [inline_state(r) if len(r["questions"]) == 1 and R.random() < 0.3 else r for r in got]
         rows += got
         print(f"{name:12s} {len(got):6d}", flush=True)
     R.shuffle(rows)

@@ -93,6 +93,7 @@ WORK       = "/content/drive/MyDrive/ezjev"  # 数据、断点都放在 Drive �
 MERGED_DIR = "/content/ezjev-merged"
 
 SEED       = 0
+DATA_VERSION = 1      # 1 = 原来的 27 个数据源；第二版数据（parts/data_v2.py）在 HF Jobs 上构造，见 jobs/data_job.py
 DATA_SCALE = 1.0      # 数据量倍率：1.0 约 5.5 万题；先试跑可以用 0.05
 MAX_LEN    = 8192     # 超过这个长度的训练样本直接丢掉
 LORA_R, LORA_ALPHA = 16, 32
@@ -400,6 +401,9 @@ import os, json, gzip
 HF_REPO    = os.environ["HF_REPO"]
 BASE_MODEL = os.environ.get("BASE_MODEL", "Qwen/Qwen3.5-4B")
 DATA_SCALE = float(os.environ.get("DATA_SCALE", "1.0"))
+DATA_VERSION = int(os.environ.get("DATA_VERSION", "1"))
+DATA_REPO  = os.environ.get("DATA_REPO")   # 设了就直接下载 jobs/data_job.py 做好的数据（{DATA_NAME}/train.jsonl.gz、dev.jsonl.gz）
+DATA_NAME  = os.environ.get("DATA_NAME")
 SEED       = int(os.environ.get("SEED", "0"))
 MAX_LEN    = int(os.environ.get("MAX_LEN", "8192"))
 LORA_R     = int(os.environ.get("LORA_R", "16"))
@@ -417,13 +421,20 @@ print(f"BASE_MODEL={BASE_MODEL} DATA_SCALE={DATA_SCALE} -> {HF_REPO}", flush=Tru
 '''
 
 JOB_BUILD = '''
-rows = build(SIZES, f"{WORK}/all.jsonl.gz")
-n_dev = min(1500, max(50, len(rows) // 30))
-for name, part in (("dev", rows[:n_dev]), ("train", rows[n_dev:])):
-    with gzip.open(f"{WORK}/{name}.jsonl.gz", "wt") as f:
-        for r in part:
-            f.write(json.dumps(r, ensure_ascii=False) + "\\n")
-print("train", len(rows) - n_dev, "dev", n_dev, flush=True)
+if DATA_REPO:
+    from huggingface_hub import hf_hub_download
+    for name in ("train", "dev"):
+        p = hf_hub_download(DATA_REPO, f"{DATA_NAME}/{name}.jsonl.gz", repo_type="dataset")
+        open(f"{WORK}/{name}.jsonl.gz", "wb").write(open(p, "rb").read())
+    print("训练数据来自", DATA_REPO, DATA_NAME, flush=True)
+else:
+    rows = build(SIZES_V2 if DATA_VERSION >= 2 else SIZES, f"{WORK}/all.jsonl.gz")
+    n_dev = min(1500, max(50, len(rows) // 30))
+    for name, part in (("dev", rows[:n_dev]), ("train", rows[n_dev:])):
+        with gzip.open(f"{WORK}/{name}.jsonl.gz", "wt") as f:
+            for r in part:
+                f.write(json.dumps(r, ensure_ascii=False) + "\\n")
+    print("train", len(rows) - n_dev, "dev", n_dev, flush=True)
 '''
 
 JOB_EVAL = '''
@@ -439,10 +450,66 @@ print("温度 T =", TEMPERATURE, flush=True)
 '''
 
 job = "\n\n".join([
-    JOB_HEADER, src("data.py"), src("sizes.py"), JOB_BUILD, src("train.py"),
+    JOB_HEADER, src("data.py"), src("data_v2.py"), src("gen.py"), src("sizes.py"), JOB_BUILD, src("train.py"),
     'train_data = load_encoded(f"{WORK}/train.jsonl.gz")\ndev_data = load_encoded(f"{WORK}/dev.jsonl.gz")\n',
     setup, JOB_EVAL, training, JOB_AFTER, src("export.py"),
 ])
 (ROOT / "jobs").mkdir(exist_ok=True)
 (ROOT / "jobs" / "train_job.py").write_text(job)
 print("wrote", ROOT / "jobs" / "train_job.py")
+
+# --------------------------------------------------------------------------------------------- HF Jobs 数据构造脚本
+DATA_HEADER = '''# /// script
+# requires-python = ">=3.10"
+# dependencies = ["datasets>=3.0", "huggingface_hub", "pillow"]
+# ///
+"""ezjev 数据构造任务（HF Jobs，CPU）。由 tools/build.py 从 parts/ 生成，不要直接改这个文件。
+
+构造训练数据 → 和私有评测集去重 → 上传到私有 dataset 的 {DATA_NAME}/ 目录（train.jsonl.gz、dev.jsonl.gz、stats.json）。
+环境变量：DATA_REPO、DATA_NAME、SUITE_REPO（必填），DATA_VERSION（默认 2）、DATA_SCALE（默认 1.0）、SEED（默认 0）。
+"""
+import os, json, gzip, math, collections
+
+DATA_REPO    = os.environ["DATA_REPO"]
+DATA_NAME    = os.environ["DATA_NAME"]
+SUITE_REPO   = os.environ["SUITE_REPO"]
+DATA_VERSION = int(os.environ.get("DATA_VERSION", "2"))
+DATA_SCALE   = float(os.environ.get("DATA_SCALE", "1.0"))
+SEED         = int(os.environ.get("SEED", "0"))
+WORK         = "/tmp/ezjev"
+os.makedirs(WORK, exist_ok=True)
+print(f"DATA_VERSION={DATA_VERSION} DATA_SCALE={DATA_SCALE} -> {DATA_REPO}/{DATA_NAME}", flush=True)
+'''
+
+DATA_MAIN = '''
+rows = build(SIZES_V2 if DATA_VERSION >= 2 else SIZES, f"{WORK}/all.jsonl.gz")
+rows, dropped = decontaminate(rows, SUITE_REPO)
+n_dev = min(1500, max(50, len(rows) // 30))
+stats = {"data_version": DATA_VERSION, "data_scale": DATA_SCALE, "seed": SEED, "rows": len(rows), "dev": n_dev,
+         "per_source": {}, "dropped_by_decontam": dropped}
+for r in rows:
+    s = stats["per_source"].setdefault(r["src"], {"rows": 0, "questions": 0, "chars": 0})
+    s["rows"] += 1; s["questions"] += sum(v is not None for v in r["expected"].values())
+    s["chars"] += len(json.dumps(r, ensure_ascii=False)) * len(r["questions"])
+for name, part in (("dev", rows[:n_dev]), ("train", rows[n_dev:])):
+    with gzip.open(f"{WORK}/{name}.jsonl.gz", "wt") as f:
+        for r in part:
+            f.write(json.dumps(r, ensure_ascii=False) + "\\n")
+json.dump(stats, open(f"{WORK}/stats.json", "w"), indent=1, ensure_ascii=False)
+tot_q = sum(s["questions"] for s in stats["per_source"].values())
+tot_c = sum(s["chars"] for s in stats["per_source"].values())
+print(f"共 {len(rows)} 条样本, {tot_q} 个问题, 约 {tot_c / 4 / 1e6:.1f}M tokens（按 4 字符 / token 粗估）", flush=True)
+for src, s in sorted(stats["per_source"].items()):
+    print(f"  {src:20s} {s['rows']:6d} 条 {s['questions']:6d} 问  ~{s['chars'] / 4 / 1e6:.2f}M tok", flush=True)
+
+from huggingface_hub import HfApi
+api = HfApi()
+api.create_repo(DATA_REPO, repo_type="dataset", private=True, exist_ok=True)
+for name in ("train.jsonl.gz", "dev.jsonl.gz", "stats.json"):
+    api.upload_file(path_or_fileobj=f"{WORK}/{name}", path_in_repo=f"{DATA_NAME}/{name}", repo_id=DATA_REPO, repo_type="dataset")
+print(f"已上传: https://huggingface.co/datasets/{DATA_REPO}/tree/main/{DATA_NAME}", flush=True)
+'''
+
+data_job = "\n\n".join([DATA_HEADER, src("data.py"), src("data_v2.py"), src("gen.py"), src("sizes.py"), src("decontam.py"), DATA_MAIN])
+(ROOT / "jobs" / "data_job.py").write_text(data_job)
+print("wrote", ROOT / "jobs" / "data_job.py")

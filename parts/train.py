@@ -12,23 +12,28 @@ _, probe, _ = render(tok, "x", {"q": {"type": "noul"}}, ["A", "B"])
 LABELS, LABEL_IDS = find_labels(tok, probe["q"][0])
 
 def encode(row):
-    """一条样本 -> (token ids, 选项数, 正确选项下标)。"""
+    """一条样本 -> [(token ids, 选项数, 正确选项下标), ...]，每个问题一项（和推理时一样，每个问题单独一个提示词）。
+    expected 为 None 的问题跳过。"""
     _, out, _ = render(tok, row["state"], row["questions"], LABELS)
-    text, keys = out["q"]
-    gold = row["expected"]["q"]
-    gold = {True: "true", False: "false"}.get(gold, gold) if isinstance(gold, bool) else gold
-    return tok.encode(text, add_special_tokens=False), len(keys), keys.index(gold)
+    items = []
+    for qid, (text, keys) in out.items():
+        gold = row["expected"].get(qid)
+        if gold is None:
+            continue
+        gold = {True: "true", False: "false"}.get(gold, gold) if isinstance(gold, bool) else gold
+        items.append((tok.encode(text, add_special_tokens=False), len(keys), keys.index(gold)))
+    return items
 
 def load_encoded(path):
     rows = [json.loads(l) for l in gzip.open(path, "rt")]
     enc, dropped = [], 0
     for r in rows:
-        ids, k, g = encode(r)
-        if len(ids) > MAX_LEN:
-            dropped += 1
-            continue
-        enc.append((ids, k, g, r["src"]))
-    print(f"{path}: {len(enc)} 条, 超过 {MAX_LEN} tokens 丢弃 {dropped} 条", flush=True)
+        for ids, k, g in encode(r):
+            if len(ids) > MAX_LEN:
+                dropped += 1
+                continue
+            enc.append((ids, k, g, r["src"]))
+    print(f"{path}: {len(rows)} 条样本 → {len(enc)} 个问题, 超过 {MAX_LEN} tokens 丢弃 {dropped} 个", flush=True)
     return enc
 
 def batches(data, budget, shuffle=True):
