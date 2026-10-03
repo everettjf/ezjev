@@ -36,7 +36,7 @@ case "${1:-}" in
                run --flavor a100-large --timeout 6h --name "ezjev-ab-$v" -e HF_REPO="$USER_NAME/ezjev-0.8b-$v" \
                    -e BASE_MODEL=Qwen/Qwen3.5-0.8B -e DATA_REPO="$DATA_REPO" -e DATA_NAME="$v" -e MAX_LEN=16384 train_job.py ;;
   eval)        m="${2:?模型仓库}"; k="${3:?每个 benchmark 的 case 数，0 = 完整评测}"
-               run --flavor rtx-pro-6000 --timeout "$([ "$k" = 0 ] && echo 24h || echo 6h)" --name "ezjev-eval-${m##*/}-$k" \
+               run --flavor rtx-pro-6000 --timeout "$([ "$k" = 0 ] && echo 24h || echo 6h)" --name "ezjev-eval-$(echo "${m##*/}" | tr -c "a-zA-Z0-9_\n-" _)-$k" \
                    -e HF_REPO="$m" -e SUITE_REPO="$SUITE_REPO" -e RESULTS_REPO="$RESULTS_REPO" -e PER_BENCH="$k" eval_job.py ;;
   train)       run --flavor a100-large --timeout 10h --name ezjev-train \
                    -e HF_REPO="${HF_REPO:-$FULL_REPO}" -e BASE_MODEL="${BASE_MODEL:-Qwen/Qwen3.5-4B}" -e DATA_REPO="$DATA_REPO" \
