@@ -2,6 +2,7 @@
 
 用法：python3 tools/make_stage2.py <输出名> <数据源,数据源,...> [每个弱项最多几条] [回放比例]
 例：  python3 tools/make_stage2.py s2 tools_bfcl,tools_apibank,esci_train 3000 0.4
+环境变量 EXTRA=v2b 可以把别的数据目录（比如只含新数据源的 v2b）整份加进弱项部分。
 结果上传到 <DATA_REPO>/<输出名>/train.jsonl.gz、dev.jsonl.gz（dev 沿用 v2 的）。
 """
 import gzip, json, os, random, sys, collections
@@ -18,6 +19,8 @@ by = collections.defaultdict(list)
 for r in rows:
     by[r["src"]].append(r)
 weak = [r for s in sorted(srcs) for r in R.sample(by[s], min(per_src, len(by[s])))]
+for extra in filter(None, os.environ.get("EXTRA", "").split(",")):
+    weak += [json.loads(l) for l in gzip.open(hf_hub_download(repo, f"{extra}/train.jsonl.gz", repo_type="dataset"), "rt")]
 others = [r for r in rows if r["src"] not in srcs]
 mix = weak + R.sample(others, min(len(others), int(len(weak) * replay / (1 - replay))))
 R.shuffle(mix)
