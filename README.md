@@ -14,6 +14,21 @@
 
 抽样估分 = 每个 benchmark 随机抽 50 个 case（固定种子，各模型抽到的是同一批），用官方打分器算分，误差约几分。
 
+### JevBench
+
+另外报名了 [JevBench](https://benchmarkheaven.com/jev-models)（[bench request #193](https://github.com/fstandhartinger/jevbench/issues/193)），
+用的是 [ezjev-4b-s3](https://huggingface.co/everettjf/ezjev-4b-s3)；Decision Index 继续用 s2。
+JevBench 的分数是 Intelligence / Calibration / Speed / Cost 四项的调和平均，封存题只有维护者能跑。下面是公开 231 题的自测：
+
+| 模型 | easy (48) | original (72) | hard (111) | 合计 | ECE | p50 延迟 |
+|---|---|---|---|---|---|---|
+| ezjev-4b-s2 | 48 | 68 | 65 | 0.784 | 0.059 | 0.034 s |
+| **ezjev-4b-s3** | 48 | 71 | 68 | **0.810** | **0.044** | 0.034 s |
+
+s3 = s2 + 约 2 万条代码生成的 hard 档风格题（[`parts/gen_hard.py`](parts/gen_hard.py)：长政策文档里的多条件规则、
+营业日 / 时区 / 闰年期限、按比例退款、多跳查表、答案评判、信息不足、陷阱），再加 40% 回放，LR 5e-5。
+训练没用任何 JevBench 题目；公开题只用来自测（`jobs/launch.sh jevbench <模型仓库>`）。
+
 ## 方案
 
 | | |
@@ -39,6 +54,12 @@ jobs/launch.sh train                         # Qwen3.5-4B + v2 数据（A100，�
 jobs/launch.sh eval <你>/ezjev-4b 50         # 抽样估分（RTX PRO 6000，约 15 分钟）
 jobs/launch.sh eval <你>/ezjev-4b 0          # 完整评测（约 6–7 小时，中断后重跑同一命令会续跑）
 ```
+
+JevBench 自测：`jobs/launch.sh jevbench <模型仓库>`（RTX PRO 6000，约 9 分钟，结果在 `<RESULTS_REPO>/jevbench/`）。
+
+s3：`DATA_ONLY="hard_temporal:7000,hard_policy:5000,hard_multihop:3500,hard_judge:3000,hard_trap:1500" jobs/launch.sh data v3h`，
+`EXTRA=v3h python3 tools/make_stage2.py s3 contractnli_train,sharc,ragtruth_train,gen_crux,gen_bbh 1500 0.4`，
+然后 `HF_REPO=<你>/ezjev-4b-s3 BASE_MODEL=<你>/ezjev-4b-s2 DATA_NAME=s3 LR=5e-5 jobs/launch.sh train`（A100，约 2.6 小时）。
 
 弱项强化：`DATA_ONLY="phish:3000,hover_like:2500" jobs/launch.sh data v2b`，
 `EXTRA=v2b python3 tools/make_stage2.py s2 <数据源,...> 3000 0.4`，
