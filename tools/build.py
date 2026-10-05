@@ -450,7 +450,7 @@ print("温度 T =", TEMPERATURE, flush=True)
 '''
 
 job = "\n\n".join([
-    JOB_HEADER, src("data.py"), src("data_v2.py"), src("gen.py"), src("sizes.py"), JOB_BUILD, src("train.py"),
+    JOB_HEADER, src("data.py"), src("data_v2.py"), src("gen.py"), src("gen_hard.py"), src("sizes.py"), JOB_BUILD, src("train.py"),
     'train_data = load_encoded(f"{WORK}/train.jsonl.gz")\ndev_data = load_encoded(f"{WORK}/dev.jsonl.gz")\n',
     setup, JOB_EVAL, training, JOB_AFTER, src("export.py"),
 ])
@@ -514,6 +514,6 @@ for name in ("train.jsonl.gz", "dev.jsonl.gz", "stats.json"):
 print(f"已上传: https://huggingface.co/datasets/{DATA_REPO}/tree/main/{DATA_NAME}", flush=True)
 '''
 
-data_job = "\n\n".join([DATA_HEADER, src("data.py"), src("data_v2.py"), src("gen.py"), src("sizes.py"), src("decontam.py"), DATA_MAIN])
+data_job = "\n\n".join([DATA_HEADER, src("data.py"), src("data_v2.py"), src("gen.py"), src("gen_hard.py"), src("sizes.py"), src("decontam.py"), DATA_MAIN])
 (ROOT / "jobs" / "data_job.py").write_text(data_job)
 print("wrote", ROOT / "jobs" / "data_job.py")
