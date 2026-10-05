@@ -9,6 +9,7 @@
 #   jobs/launch.sh train          正式训练：Qwen3.5-4B，v2 数据（A100）
 #   jobs/launch.sh eval-sample    正式模型抽样估分（每个 benchmark 50 个 case）
 #   jobs/launch.sh eval-full      正式模型完整评测（可提交榜单；中断后重跑同一命令会续跑）
+#   jobs/launch.sh jevbench <模型仓库>  JevBench 231 条公开题自测（准确率 / ECE / 延迟 / 成本）
 # 看任务：hf jobs ps / hf jobs logs <id> / hf jobs cancel <id>
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -45,5 +46,8 @@ case "${1:-}" in
                    -e HF_REPO="$FULL_REPO" -e SUITE_REPO="$SUITE_REPO" -e RESULTS_REPO="$RESULTS_REPO" -e PER_BENCH=50 eval_job.py ;;
   eval-full)   run --flavor rtx-pro-6000 --timeout 24h --name ezjev-eval-full \
                    -e HF_REPO="$FULL_REPO" -e SUITE_REPO="$SUITE_REPO" -e RESULTS_REPO="$RESULTS_REPO" -e PER_BENCH=0 eval_job.py ;;
-  *) sed -n 2,13p "$0"; exit 1 ;;
+  jevbench)    m="${2:?模型仓库}"
+               run --flavor rtx-pro-6000 --timeout 2h --name "ezjev-jevbench-$(echo "${m##*/}" | tr -c "a-zA-Z0-9_\n-" _)" \
+                   -e HF_REPO="$m" -e RESULTS_REPO="$RESULTS_REPO" ${JEVBENCH_REV:+-e JEVBENCH_REV="$JEVBENCH_REV"} jevbench_job.py ;;
+  *) sed -n 2,14p "$0"; exit 1 ;;
 esac
