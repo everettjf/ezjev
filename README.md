@@ -3,6 +3,8 @@
 训练一个 Jev 风格的决策模型（typed decisions：`choice` / `noul` / `score`，每个选项给一个概率），
 参加 [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 0.2.1 榜单。
 
+项目主页：**https://everettjf.github.io/ezjev/**（模型介绍、下载和快速上手）
+
 ## 结果
 
 | 模型 | 数据 | Decision Index 0.2.1 |

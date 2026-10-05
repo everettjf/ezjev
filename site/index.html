@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ezjev — calibrated typed decisions from a 4B model</title>
+<meta name="description" content="ezjev is an open 4B typed-decision model (Jev-style /v1/systemone): choice, noul and score questions answered with calibrated per-option probabilities from one forward pass.">
+<meta property="og:title" content="ezjev — calibrated typed decisions from a 4B model">
+<meta property="og:description" content="Open 4B decision model: per-option probabilities from one prefill, ~34 ms p50. Decision Index 0.2.1: 51.15. JevBench public self-test: 187/231.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232a78d6'/%3E%3Cpath d='M18 34l9 9 19-21' stroke='white' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #fcfcfb; --bg-2: #f4f3f0; --card: #ffffff; --line: #e6e5e0;
+  --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #8a8984;
+  --accent: #2a78d6; --accent-ink: #1f5fae; --accent-soft: #e8f0fb;
+  --s2: #b9b8b2; --c2: #eb6834; --c3: #1baf7a;
+  --code-bg: #0f1115; --code-ink: #e6e6e3; --code-dim: #8b8f98; --code-key: #7cb7ff; --code-str: #9fd8a8; --code-num: #f2b36a;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #141413; --bg-2: #1b1b1a; --card: #1f1f1e; --line: #2f2f2d;
+    --ink: #f5f5f3; --ink-2: #c3c2b7; --ink-3: #8f8e88;
+    --accent: #3987e5; --accent-ink: #8cbcf5; --accent-soft: #1d2a3b;
+    --s2: #6d6c67; --c2: #d95926; --c3: #199e70;
+    --code-bg: #0b0c0f; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #141413; --bg-2: #1b1b1a; --card: #1f1f1e; --line: #2f2f2d;
+  --ink: #f5f5f3; --ink-2: #c3c2b7; --ink-3: #8f8e88;
+  --accent: #3987e5; --accent-ink: #8cbcf5; --accent-soft: #1d2a3b;
+  --s2: #6d6c67; --c2: #d95926; --c3: #199e70;
+  --code-bg: #0b0c0f; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+html[data-lang="en"] [lang="zh"], html[data-lang="zh"] [lang="en"] { display: none !important; }
+a { color: var(--accent-ink); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+:not(pre) > code { background: var(--bg-2); border: 1px solid var(--line); padding: .05em .4em; border-radius: 6px; font-size: .88em; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+/* nav */
+nav { position: sticky; top: 0; z-index: 10; backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px);
+      background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--line); }
+nav .wrap { display: flex; align-items: center; gap: 22px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: var(--ink); letter-spacing: -.01em; }
+.brand:hover { text-decoration: none; }
+.logo { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
+.navlinks { display: flex; gap: 18px; margin-left: 8px; }
+.navlinks a { color: var(--ink-2); font-size: 15px; }
+.navlinks a:hover { color: var(--ink); text-decoration: none; }
+.spacer { flex: 1; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--card); color: var(--ink-2);
+        border-radius: 999px; padding: 6px 12px; font-size: 14px; cursor: pointer; }
+.pill:hover { color: var(--ink); text-decoration: none; border-color: var(--ink-3); }
+@media (max-width: 860px) { .navlinks { display: none; } }
+
+/* hero */
+.hero { padding: 72px 0 40px; }
+.hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
+@media (max-width: 960px) { .hero-grid { grid-template-columns: 1fr; gap: 32px; } .hero { padding-top: 44px; } }
+.eyebrow { display: inline-flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--accent-ink); background: var(--accent-soft);
+           padding: 5px 12px; border-radius: 999px; font-weight: 600; }
+h1 { font-size: clamp(36px, 5.4vw, 58px); line-height: 1.07; letter-spacing: -.03em; margin: 18px 0 18px; }
+h1 .grad { background: linear-gradient(100deg, var(--accent) 10%, #7b5cf0 90%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 36em; margin: 0 0 28px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 15.5px;
+       border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+.btn:hover { text-decoration: none; border-color: var(--ink-3); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.07); }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 44px; }
+@media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px 16px; }
+.stat .num { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+.stat .num small { font-size: 15px; color: var(--ink-3); font-weight: 600; margin-left: 2px; }
+.stat .lbl { font-size: 13.5px; color: var(--ink-2); line-height: 1.4; margin-top: 4px; }
+
+/* code */
+.code { background: var(--code-bg); color: var(--code-ink); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+        border: 1px solid #23262d; }
+.code .bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #23262d; font-size: 12.5px; color: var(--code-dim); }
+.code .dots { display: flex; gap: 6px; margin-right: 6px; }
+.code .dots i { width: 10px; height: 10px; border-radius: 50%; background: #3a3d45; display: block; }
+.code .bar .copy { margin-left: auto; background: transparent; border: 1px solid #353943; color: var(--code-dim); border-radius: 6px;
+                   padding: 3px 9px; font-size: 12px; cursor: pointer; }
+.code .bar .copy:hover { color: #fff; border-color: #5a5f6b; }
+.code pre { margin: 0; padding: 16px 18px; overflow-x: auto; font-size: 13.4px; line-height: 1.6; }
+.hero-pre { font-size: 12.8px !important; }
+.c-d { color: var(--code-dim); } .c-k { color: var(--code-key); } .c-s { color: var(--code-str); } .c-n { color: var(--code-num); }
+
+/* sections */
+section { padding: 64px 0; }
+section.alt { background: var(--bg-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+h2 { font-size: clamp(26px, 3.4vw, 36px); letter-spacing: -.02em; line-height: 1.15; margin: 0 0 10px; }
+.sub { color: var(--ink-2); font-size: 17px; max-width: 46em; margin: 0 0 32px; }
+h3 { font-size: 19px; margin: 0 0 8px; letter-spacing: -.01em; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+@media (max-width: 860px) { .grid3, .grid2 { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+.card p { color: var(--ink-2); margin: 0; }
+.tag { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink);
+       margin-bottom: 10px; font-family: ui-monospace, Menlo, monospace; }
+
+/* models */
+.model { position: relative; display: flex; flex-direction: column; gap: 12px; }
+.model.rec { border: 1.5px solid var(--accent); box-shadow: var(--shadow); }
+.badge { position: absolute; top: -12px; right: 18px; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+.model .name { font-family: ui-monospace, Menlo, monospace; font-size: 19px; font-weight: 700; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 14.5px; margin: 4px 0 2px; }
+.kv dt { color: var(--ink-3); } .kv dd { margin: 0; color: var(--ink); }
+.model .code pre { font-size: 12.6px; padding: 12px 14px; }
+.model .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: auto; }
+.model .btn { padding: 9px 14px; font-size: 14.5px; }
+
+/* steps */
+.steps { display: grid; gap: 18px; counter-reset: s; }
+.step { display: grid; grid-template-columns: 44px 1fr; gap: 16px; align-items: start; }
+.step .n { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-ink); display: grid; place-items: center; font-weight: 800; }
+.step h3 { margin-top: 5px; }
+.step p { color: var(--ink-2); margin: 0 0 10px; }
+.note { font-size: 14px; color: var(--ink-2); background: var(--card); border: 1px dashed var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 4px; }
+
+/* how */
+.flow { width: 100%; height: auto; display: block; }
+.flow text { font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif; }
+
+/* charts */
+.chart { display: grid; gap: 14px; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13.5px; color: var(--ink-2); margin-bottom: 4px; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.grp .glabel { font-size: 14px; color: var(--ink); margin-bottom: 6px; font-weight: 600; }
+.row { display: grid; grid-template-columns: 1fr 52px; align-items: center; gap: 10px; margin: 3px 0; }
+.track { height: 12px; background: transparent; position: relative; }
+.fill { height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+.row .v { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.row.me .v { color: var(--ink); font-weight: 700; }
+.chart-foot { font-size: 13px; color: var(--ink-3); margin-top: 6px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--ink-3); font-weight: 600; font-size: 13px; text-transform: none; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.me td { font-weight: 700; }
+.tablewrap { overflow-x: auto; }
+.grid2 > *, .grid3 > *, .hero-grid > *, .step > *, .boards > *, .steps > * { min-width: 0; }
+.step { grid-template-columns: 44px minmax(0, 1fr); }
+.flowwrap { overflow-x: auto; }
+.flowwrap .flow { min-width: 760px; }
+@media (max-width: 560px) { .step { grid-template-columns: minmax(0, 1fr); gap: 8px; } .wrap { padding: 0 16px; } }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+          background: color-mix(in srgb, #eda100 18%, var(--card)); color: var(--ink); border: 1px solid color-mix(in srgb, #eda100 45%, var(--line)); }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #eda100; }
+.stat .status { margin-top: 8px; font-size: 11.5px; padding: 2px 8px; }
+.boards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+@media (max-width: 860px) { .boards { grid-template-columns: 1fr; } }
+.board h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.board .big { font-size: 34px; font-weight: 750; letter-spacing: -.02em; margin: 4px 0 2px; }
+.board .big small { font-size: 15px; color: var(--ink-3); font-weight: 600; }
+.board p { font-size: 14.5px; }
+
+ul.clean { padding-left: 1.1em; margin: 0; color: var(--ink-2); }
+ul.clean li { margin: 6px 0; }
+footer { padding: 40px 0 56px; color: var(--ink-3); font-size: 14px; border-top: 1px solid var(--line); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="logo"><svg width="16" height="16" viewBox="0 0 64 64"><path d="M14 34l11 11 25-27" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>ezjev</a>
+    <div class="navlinks">
+      <a href="#models"><span lang="en">Models</span><span lang="zh">模型</span></a>
+      <a href="#quickstart"><span lang="en">Quickstart</span><span lang="zh">快速上手</span></a>
+      <a href="#how"><span lang="en">How it works</span><span lang="zh">原理</span></a>
+      <a href="#results"><span lang="en">Results</span><span lang="zh">成绩</span></a>
+      <a href="#data"><span lang="en">Training data</span><span lang="zh">训练数据</span></a>
+    </div>
+    <div class="spacer"></div>
+    <button class="pill" id="langBtn" type="button" aria-label="Switch language"><span lang="en">中文</span><span lang="zh">English</span></button>
+    <a class="pill" href="https://github.com/everettjf/ezjev">GitHub</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow"><span lang="en">Open weights · Qwen3.5-4B fine-tune</span><span lang="zh">开放权重 · 基于 Qwen3.5-4B 微调</span></span>
+        <h1><span lang="en">Calibrated <span class="grad">typed decisions</span> from a 4B model</span><span lang="zh">一个 4B 模型，给出<span class="grad">校准过的决策概率</span></span></h1>
+        <p class="lede">
+          <span lang="en">ezjev reads a piece of state — an email, a contract, a ticket, a tool list — and answers <code>choice</code>, <code>noul</code> and <code>score</code> questions with a probability for every option. One prefill, no generated tokens, served through the Jev-style <code>/v1/systemone</code> API.</span>
+          <span lang="zh">ezjev 读入一段状态（邮件、合同、工单、工具列表……），回答 <code>choice</code>、<code>noul</code>、<code>score</code> 三类问题，给每个选项一个概率。只做一次 prefill，不生成文字，接口是 Jev 风格的 <code>/v1/systemone</code>。</span>
+        </p>
+        <div class="cta">
+          <a class="btn primary" href="#models"><span lang="en">Download the model</span><span lang="zh">下载模型</span> →</a>
+          <a class="btn" href="#quickstart"><span lang="en">Run it in 3 commands</span><span lang="zh">三条命令跑起来</span></a>
+        </div>
+      </div>
+      <div class="code" aria-label="Example request and response">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>POST /v1/systemone</div>
+<pre class="hero-pre"><span class="c-d">// request</span>
+{
+  <span class="c-k">"state"</span>: <span class="c-s">"I was charged twice. Please refund
+            the duplicate."</span>,
+  <span class="c-k">"questions"</span>: {
+    <span class="c-k">"refund"</span>: {
+      <span class="c-k">"type"</span>: <span class="c-s">"noul"</span>,
+      <span class="c-k">"instructions"</span>: <span class="c-s">"Does the user request a refund?"</span> },
+    <span class="c-k">"dept"</span>: {
+      <span class="c-k">"type"</span>: <span class="c-s">"choice"</span>,
+      <span class="c-k">"instructions"</span>: <span class="c-s">"Which department?"</span>,
+      <span class="c-k">"criteria"</span>: {
+        <span class="c-k">"billing"</span>: <span class="c-s">"Payments and refunds"</span>,
+        <span class="c-k">"technical"</span>: <span class="c-s">"Software bugs"</span> } } }
+}
+<span class="c-d">// response — numbers illustrative</span>
+{
+  <span class="c-k">"answers"</span>: {
+    <span class="c-k">"refund"</span>: { <span class="c-k">"type"</span>: <span class="c-s">"noul"</span>, <span class="c-k">"noul"</span>: <span class="c-n">0.98</span> },
+    <span class="c-k">"dept"</span>: { <span class="c-k">"type"</span>: <span class="c-s">"choice"</span>, <span class="c-k">"choice"</span>: <span class="c-s">"billing"</span>,
+      <span class="c-k">"probabilities"</span>: { <span class="c-k">"billing"</span>: <span class="c-n">0.97</span>,
+                         <span class="c-k">"technical"</span>: <span class="c-n">0.03</span> } } }
+}</pre>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="num">51.15</div><div class="lbl"><span lang="en">Jev Decision Index 0.2.1, full run (ezjev-4b-s2)</span><span lang="zh">Jev Decision Index 0.2.1 完整评测（ezjev-4b-s2）</span></div><span class="status"><span lang="en">listing pending</span><span lang="zh">上榜待审核</span></span></div>
+      <div class="stat"><div class="num">187<small>/231</small></div><div class="lbl"><span lang="en">JevBench public items, self-test (ezjev-4b-s3)</span><span lang="zh">JevBench 公开题自测（ezjev-4b-s3）</span></div><span class="status"><span lang="en">official run queued</span><span lang="zh">正式评测排队中</span></span></div>
+      <div class="stat"><div class="num">34<small>ms</small></div><div class="lbl"><span lang="en">p50 latency per decision, one RTX PRO 6000</span><span lang="zh">单次决策 p50 延迟，一张 RTX PRO 6000</span></div></div>
+      <div class="stat"><div class="num">0.044</div><div class="lbl"><span lang="en">Expected calibration error on JevBench public items</span><span lang="zh">JevBench 公开题上的校准误差（ECE）</span></div></div>
+    </div>
+  </div>
+</header>
+
+<section class="alt" id="what">
+  <div class="wrap">
+    <h2><span lang="en">Three question types</span><span lang="zh">三类问题</span></h2>
+    <p class="sub"><span lang="en">Every question comes back as a probability distribution over its options, so you can set thresholds, route on confidence, or abstain.</span><span lang="zh">每个问题返回的都是选项上的概率分布，可以按置信度设阈值、分流，或者选择不回答。</span></p>
+    <div class="grid3">
+      <div class="card"><span class="tag">choice</span><h3><span lang="en">Pick one option</span><span lang="zh">多选一</span></h3><p><span lang="en">Routing, intent, tool selection, policy outcomes. Named options with descriptions; up to hundreds of options.</span><span lang="zh">路由、意图识别、工具选择、政策判定。选项带名称和说明，最多可以有几百个。</span></p></div>
+      <div class="card"><span class="tag">noul</span><h3><span lang="en">Is it true?</span><span lang="zh">是否成立</span></h3><p><span lang="en">Returns P(true): phishing or not, supported by the evidence or not, did the answer meet every requirement.</span><span lang="zh">返回 P(true)：是不是钓鱼邮件、证据是否支持、回答是否满足了所有要求。</span></p></div>
+      <div class="card"><span class="tag">score</span><h3><span lang="en">Ordinal scale</span><span lang="zh">有序打分</span></h3><p><span lang="en">Severity, urgency, quality — a distribution over ordered levels, not just a single number.</span><span lang="zh">严重程度、紧急程度、质量——给出各个等级上的分布，而不只是一个数字。</span></p></div>
+    </div>
+  </div>
+</section>
+
+<section id="models">
+  <div class="wrap">
+    <h2><span lang="en">Models</span><span lang="zh">模型</span></h2>
+    <p class="sub"><span lang="en">Both are full merged BF16 weights (~9.1 GB) on Hugging Face. Use <b>s3</b> unless you need to reproduce the Decision Index run.</span><span lang="zh">两个版本都是合并好的完整 BF16 权重（约 9.1 GB），放在 Hugging Face 上。除非要复现 Decision Index 的成绩，否则用 <b>s3</b>。</span></p>
+    <div class="grid2">
+      <div class="card model rec">
+        <span class="badge"><span lang="en">Recommended</span><span lang="zh">推荐</span></span>
+        <div class="name">ezjev-4b-s3</div>
+        <p><span lang="en">Latest. s2 plus ~20k code-generated long-document and date/number reasoning decisions. Submitted to JevBench.</span><span lang="zh">最新版。在 s2 基础上加了约 2 万道代码生成的长文档、日期和数字推理题。已报名 JevBench。</span></p>
+        <dl class="kv">
+          <dt><span lang="en">Revision</span><span lang="zh">版本</span></dt><dd class="mono">36d180d</dd>
+          <dt><span lang="en">Temperature</span><span lang="zh">温度</span></dt><dd class="mono">1.34</dd>
+          <dt>JevBench</dt><dd><span lang="en">187/231 public self-test · ECE 0.044</span><span lang="zh">公开题自测 187/231 · ECE 0.044</span></dd>
+        </dl>
+        <div class="code"><div class="bar">shell<button class="copy" type="button">copy</button></div><pre>hf download everettjf/ezjev-4b-s3 --local-dir ezjev-4b-s3</pre></div>
+        <div class="actions">
+          <a class="btn primary" href="https://huggingface.co/everettjf/ezjev-4b-s3">🤗 <span lang="en">Model card</span><span lang="zh">模型页面</span></a>
+          <a class="btn" href="https://huggingface.co/everettjf/ezjev-4b-s3/tree/main"><span lang="en">Files</span><span lang="zh">文件</span></a>
+        </div>
+      </div>
+      <div class="card model">
+        <div class="name">ezjev-4b-s2</div>
+        <p><span lang="en">The checkpoint behind the full Jev Decision Index 0.2.1 run (51.15).</span><span lang="zh">Jev Decision Index 0.2.1 完整评测（51.15）用的就是这个版本。</span></p>
+        <dl class="kv">
+          <dt><span lang="en">Revision</span><span lang="zh">版本</span></dt><dd class="mono">3d77eb1</dd>
+          <dt><span lang="en">Temperature</span><span lang="zh">温度</span></dt><dd class="mono">1.26</dd>
+          <dt>Decision Index</dt><dd><span lang="en">51.15 · full 150,759-request run</span><span lang="zh">51.15 · 150,759 条完整评测</span></dd>
+        </dl>
+        <div class="code"><div class="bar">shell<button class="copy" type="button">copy</button></div><pre>hf download everettjf/ezjev-4b-s2 --local-dir ezjev-4b-s2</pre></div>
+        <div class="actions">
+          <a class="btn" href="https://huggingface.co/everettjf/ezjev-4b-s2">🤗 <span lang="en">Model card</span><span lang="zh">模型页面</span></a>
+          <a class="btn" href="https://huggingface.co/datasets/everettjf/decision-index-results-ezjev-4b-s2"><span lang="en">Eval results</span><span lang="zh">评测结果</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="quickstart">
+  <div class="wrap">
+    <h2><span lang="en">Quickstart</span><span lang="zh">快速上手</span></h2>
+    <p class="sub"><span lang="en">About 10 minutes from a fresh GPU machine to your first decision. Two processes run side by side: <b>vLLM</b> loads the model and computes option logprobs, and <a href="https://github.com/tic-top/llm2jev">llm2jev</a> turns them into the <code>/v1/systemone</code> API your code calls.</span><span lang="zh">从一台新的 GPU 机器到拿到第一个决策结果，大约 10 分钟。需要同时运行两个进程：<b>vLLM</b> 加载模型、计算各选项的 logprob；<a href="https://github.com/tic-top/llm2jev">llm2jev</a> 把结果包装成 <code>/v1/systemone</code> 接口，供你的代码调用。</span></p>
+
+    <div class="grid3" style="margin-bottom:28px">
+      <div class="card"><h3><span lang="en">You need</span><span lang="zh">准备</span></h3><ul class="clean">
+        <li><span lang="en">Linux + one NVIDIA GPU with ≥ 24 GB (weights are 9.1 GB in BF16)</span><span lang="zh">Linux + 一张 24 GB 以上显存的 NVIDIA GPU（BF16 权重 9.1 GB）</span></li>
+        <li><span lang="en">Python 3.10+ and a recent CUDA driver</span><span lang="zh">Python 3.10+ 和较新的 CUDA 驱动</span></li>
+        <li><span lang="en">~12 GB of disk for the weights</span><span lang="zh">约 12 GB 磁盘空间放权重</span></li>
+      </ul></div>
+      <div class="card"><h3><span lang="en">You get</span><span lang="zh">得到</span></h3><ul class="clean">
+        <li><span lang="en">An HTTP endpoint on port 8080</span><span lang="zh">一个监听 8080 端口的 HTTP 接口</span></li>
+        <li><span lang="en">Many questions per request, each answered with per-option probabilities</span><span lang="zh">一次请求可以问多个问题，每个问题返回各选项的概率</span></li>
+        <li><span lang="en">~34 ms per decision, no generated tokens</span><span lang="zh">每次决策约 34 毫秒，不生成文字</span></li>
+      </ul></div>
+      <div class="card"><h3><span lang="en">Which model?</span><span lang="zh">用哪个模型</span></h3><ul class="clean">
+        <li><span lang="en"><b>ezjev-4b-s3</b>, temperature <b>1.34</b>: use this one</span><span lang="zh"><b>ezjev-4b-s3</b>，温度 <b>1.34</b>：一般用这个</span></li>
+        <li><span lang="en"><b>ezjev-4b-s2</b>, temperature <b>1.26</b>: to reproduce the Decision Index run</span><span lang="zh"><b>ezjev-4b-s2</b>，温度 <b>1.26</b>：复现 Decision Index 成绩时用</span></li>
+      </ul></div>
+    </div>
+
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div>
+        <h3><span lang="en">Install</span><span lang="zh">安装</span></h3>
+        <p><span lang="en">Use a fresh virtual environment; these are the exact versions we test with.</span><span lang="zh">建议用一个新的虚拟环境；下面是我们测试时用的确切版本。</span></p>
+        <div class="code"><div class="bar">shell<button class="copy" type="button">copy</button></div><pre>python -m venv ezjev-env &amp;&amp; source ezjev-env/bin/activate
+pip install "vllm==0.30.0" "llm2jev==0.6.1"</pre></div>
+      </div></div>
+
+      <div class="step"><div class="n">2</div><div>
+        <h3><span lang="en">Start vLLM (terminal 1)</span><span lang="zh">启动 vLLM（终端 1）</span></h3>
+        <p><span lang="en">The first start downloads the weights from Hugging Face (9.1 GB). Leave it running.</span><span lang="zh">第一次启动会从 Hugging Face 下载权重（9.1 GB）。启动后让它一直运行。</span></p>
+        <div class="code"><div class="bar">shell<button class="copy" type="button">copy</button></div><pre>vllm serve everettjf/ezjev-4b-s3 --port 8000 \
+  --max-logprobs 256 --return-tokens-as-token-ids --max-model-len 32768</pre></div>
+        <p class="note"><span lang="en"><b>Ready when</b> <code>curl -s localhost:8000/health</code> returns HTTP 200. <code>--max-logprobs</code> and <code>--return-tokens-as-token-ids</code> are required — without them every request fails.</span><span lang="zh"><b>就绪的标志：</b><code>curl -s localhost:8000/health</code> 返回 HTTP 200。<code>--max-logprobs</code> 和 <code>--return-tokens-as-token-ids</code> 两个参数必须加，否则每个请求都会失败。</span></p>
+      </div></div>
+
+      <div class="step"><div class="n">3</div><div>
+        <h3><span lang="en">Start the decision API (terminal 2)</span><span lang="zh">启动决策接口（终端 2）</span></h3>
+        <p><span lang="en"><code>--model</code> must match the model vLLM serves; <code>--temperature</code> must match the model (1.34 for s3).</span><span lang="zh"><code>--model</code> 要和 vLLM 加载的模型一致；<code>--temperature</code> 要和模型对应（s3 用 1.34）。</span></p>
+        <div class="code"><div class="bar">shell<button class="copy" type="button">copy</button></div><pre>llm2jev --model everettjf/ezjev-4b-s3 --backend vllm \
+  --url http://127.0.0.1:8000 --port 8080 --prompt chat --temperature 1.34</pre></div>
+        <p class="note"><span lang="en"><b>Ready when</b> <code>curl -s localhost:8080/health</code> returns <code>{"status": "ok", ...}</code>.</span><span lang="zh"><b>就绪的标志：</b><code>curl -s localhost:8080/health</code> 返回 <code>{"status": "ok", ...}</code>。</span></p>
+      </div></div>
+
+      <div class="step"><div class="n">4</div><div>
+        <h3><span lang="en">Ask questions</span><span lang="zh">提问</span></h3>
+        <p><span lang="en">Send a <code>state</code> (any text, or a JSON object) and one or more named questions. Write <code>criteria</code> as short, mutually exclusive descriptions — they are what the model chooses between.</span><span lang="zh">发送一段 <code>state</code>（任意文字，也可以是 JSON 对象），加上一个或多个带名字的问题。<code>criteria</code> 写成简短、互斥的描述——模型就是在这些描述之间做选择。</span></p>
+        <div class="grid2">
+          <div class="code"><div class="bar">curl<button class="copy" type="button">copy</button></div><pre>curl -s http://127.0.0.1:8080/v1/systemone -d '{
+  "state": "I was charged twice. Please refund the duplicate.",
+  "questions": {
+    "refund": {"type": "noul",
+               "instructions": "Does the user request a refund?"},
+    "dept": {"type": "choice", "instructions": "Which department?",
+             "criteria": {"billing": "Payments and refunds",
+                          "technical": "Software bugs"}}
+  }
+}'</pre></div>
+          <div class="code"><div class="bar">python<button class="copy" type="button">copy</button></div><pre>import requests
+
+API = "http://127.0.0.1:8080/v1/systemone"
+r = requests.post(API, json={
+    "state": "Order 1182 arrived with a cracked screen.",
+    "questions": {
+        "urgency": {"type": "score",
+                    "instructions": "How urgent is this?",
+                    "criteria": ["routine", "soon", "urgent"]},
+        "replace": {"type": "noul",
+                    "instructions": "Is a refund or replacement due?"},
+    },
+}, timeout=30)
+r.raise_for_status()
+a = r.json()["answers"]
+print(a["urgency"]["probabilities"])   # {"0": .., "1": .., "2": ..}
+print(a["replace"]["noul"])            # P(true)</pre></div>
+        </div>
+      </div></div>
+
+      <div class="step"><div class="n">5</div><div>
+        <h3><span lang="en">Read the answer</span><span lang="zh">读取结果</span></h3>
+        <div class="tablewrap card" style="padding:6px 14px">
+          <table>
+            <tr><th><span lang="en">Type</span><span lang="zh">题型</span></th><th><span lang="en">What you send</span><span lang="zh">请求里写什么</span></th><th><span lang="en">What you get back</span><span lang="zh">返回什么</span></th></tr>
+            <tr><td class="mono">noul</td><td><span lang="en"><code>instructions</code> (a yes/no statement); optional <code>criteria</code> <code>{"true": …, "false": …}</code></span><span lang="zh"><code>instructions</code>（一个是非判断）；可选 <code>criteria</code> <code>{"true": …, "false": …}</code></span></td><td><span lang="en"><code>"noul"</code>: P(true), between 0 and 1</span><span lang="zh"><code>"noul"</code>：P(true)，0 到 1 之间</span></td></tr>
+            <tr><td class="mono">choice</td><td><span lang="en"><code>criteria</code>: <code>{name: description}</code></span><span lang="zh"><code>criteria</code>：<code>{名称: 描述}</code></span></td><td><span lang="en"><code>"choice"</code> (the most likely name) and <code>"probabilities"</code> per name</span><span lang="zh"><code>"choice"</code>（概率最高的选项名）和每个选项的 <code>"probabilities"</code></span></td></tr>
+            <tr><td class="mono">score</td><td><span lang="en"><code>criteria</code>: list of levels, lowest first</span><span lang="zh"><code>criteria</code>：等级列表，从低到高</span></td><td><span lang="en"><code>"probabilities"</code> keyed by level index <code>"0"</code>, <code>"1"</code>, …</span><span lang="zh"><code>"probabilities"</code>，键是等级下标 <code>"0"</code>、<code>"1"</code>……</span></td></tr>
+          </table>
+        </div>
+        <p class="note" style="margin-top:12px"><span lang="en"><b>Using the probabilities:</b> act automatically above a threshold (e.g. 0.9) and send the rest to a human or a bigger model. On the 231 JevBench public items, s3 was ≥ 0.9 confident on 132 of them and got 97% of those right (all 93 answers at ≥ 0.95 were right).</span><span lang="zh"><b>怎么用这些概率：</b>高于某个阈值（比如 0.9）就自动处理，其余交给人工或更大的模型。在 JevBench 公开题上，s3 在 231 道 JevBench 公开题里，有 132 道的置信度 ≥ 0.9，其中 97% 答对；置信度 ≥ 0.95 的 93 道全部答对。</span></p>
+      </div></div>
+    </div>
+
+    <div class="grid2" style="margin-top:26px">
+      <div class="card"><h3><span lang="en">Troubleshooting</span><span lang="zh">常见问题</span></h3><ul class="clean">
+        <li><span lang="en"><b>422 / 400 on every request</b> → vLLM was started without <code>--max-logprobs 256 --return-tokens-as-token-ids</code>.</span><span lang="zh"><b>每个请求都返回 422 / 400</b> → 启动 vLLM 时漏了 <code>--max-logprobs 256 --return-tokens-as-token-ids</code>。</span></li>
+        <li><span lang="en"><b>vLLM fails compiling a kernel</b> (no <code>nvcc</code>, e.g. slim containers) → add <code>VLLM_USE_FLASHINFER_SAMPLER=0</code> and <code>--additional-config '{"gdn_prefill_backend": "triton"}'</code>. Neither changes the logprobs.</span><span lang="zh"><b>vLLM 编译 kernel 失败</b>（没有 <code>nvcc</code>，比如精简容器）→ 加上 <code>VLLM_USE_FLASHINFER_SAMPLER=0</code> 和 <code>--additional-config '{"gdn_prefill_backend": "triton"}'</code>，两者都不影响 logprob。</span></li>
+        <li><span lang="en"><b>Out of memory</b> → lower <code>--max-model-len</code> (e.g. 16384) or add <code>--gpu-memory-utilization 0.85</code>.</span><span lang="zh"><b>显存不够</b> → 调小 <code>--max-model-len</code>（比如 16384），或加 <code>--gpu-memory-utilization 0.85</code>。</span></li>
+        <li><span lang="en"><b>Different name in vLLM</b> (local path or <code>--served-model-name</code>) → pass the same name to llm2jev with <code>--served-model-name</code>.</span><span lang="zh"><b>vLLM 里的模型名不同</b>（用了本地路径或 <code>--served-model-name</code>）→ 给 llm2jev 也传同样的 <code>--served-model-name</code>。</span></li>
+      </ul></div>
+      <div class="card"><h3><span lang="en">Offline / pinned setup</span><span lang="zh">离线 / 固定版本部署</span></h3>
+        <p style="margin-bottom:10px"><span lang="en">Download once at a pinned revision, then serve from the local folder — nothing needs the network afterwards.</span><span lang="zh">按固定版本下载一次，之后从本地目录启动，不再需要联网。</span></p>
+        <div class="code"><div class="bar">shell<button class="copy" type="button">copy</button></div><pre>hf download everettjf/ezjev-4b-s3 \
+  --revision 36d180dcdf09ddb7168b06c41f88f1919c20981d --local-dir ./ezjev-4b-s3
+vllm serve ./ezjev-4b-s3 --served-model-name ezjev-4b-s3 --port 8000 \
+  --max-logprobs 256 --return-tokens-as-token-ids --max-model-len 32768
+llm2jev --model ./ezjev-4b-s3 --served-model-name ezjev-4b-s3 --backend vllm \
+  --url http://127.0.0.1:8000 --port 8080 --prompt chat --temperature 1.34</pre></div>
+        <p class="note" style="margin-top:10px"><span lang="en">Only the vLLM backend is validated for ezjev. llm2jev also offers SGLang, transformers and MLX backends (untested with this model).</span><span lang="zh">我们只在 vLLM 后端上验证过 ezjev。llm2jev 还支持 SGLang、transformers 和 MLX 后端（没有用这个模型测试过）。</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2><span lang="en">How it works</span><span lang="zh">工作原理</span></h2>
+    <p class="sub"><span lang="en">No special head and no generation. The question and all options go into one chat prompt; the model reads the logits of the option letters right after <code>Answer:</code>.</span><span lang="zh">没有特殊结构，也不生成文字。问题和所有选项放进同一个对话提示词，模型在 <code>Answer:</code> 之后读出各个选项字母的 logit。</span></p>
+    <div class="card flowwrap" style="padding:18px 18px 8px">
+      <svg class="flow" viewBox="0 0 1040 220" role="img" aria-label="Pipeline: state and question into chat prompt, one prefill, option-letter logits, softmax with temperature, probabilities">
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink-3)"/></marker></defs>
+        <g font-size="14" fill="var(--ink)">
+          <rect x="6" y="40" width="190" height="130" rx="12" fill="var(--bg-2)" stroke="var(--line)"/>
+          <text x="22" y="68" font-weight="700">state</text>
+          <text x="22" y="92" fill="var(--ink-2)" font-size="13">email · contract · ticket</text>
+          <text x="22" y="124" font-weight="700">question</text>
+          <text x="22" y="148" fill="var(--ink-2)" font-size="13">A) billing  B) technical</text>
+
+          <rect x="236" y="40" width="210" height="130" rx="12" fill="var(--bg-2)" stroke="var(--line)"/>
+          <text x="252" y="68" font-weight="700">chat template</text>
+          <text x="252" y="94" fill="var(--ink-2)" font-size="13" font-family="ui-monospace,Menlo,monospace">user: &lt;state&gt;</text>
+          <text x="252" y="116" fill="var(--ink-2)" font-size="13" font-family="ui-monospace,Menlo,monospace">user: &lt;question+opts&gt;</text>
+          <text x="252" y="138" fill="var(--accent)" font-size="13" font-family="ui-monospace,Menlo,monospace">assistant: Answer:▮</text>
+
+          <rect x="486" y="40" width="160" height="130" rx="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="566" y="88" text-anchor="middle" font-weight="700">Qwen3.5-4B</text>
+          <text x="566" y="110" text-anchor="middle" fill="var(--ink-2)" font-size="13">+ ezjev LoRA</text>
+          <text x="566" y="132" text-anchor="middle" fill="var(--ink-2)" font-size="13">one prefill</text>
+
+          <rect x="686" y="40" width="160" height="130" rx="12" fill="var(--bg-2)" stroke="var(--line)"/>
+          <text x="702" y="68" font-weight="700">logits</text>
+          <text x="702" y="96" fill="var(--ink-2)" font-size="13" font-family="ui-monospace,Menlo,monospace">A  4.1</text>
+          <text x="702" y="118" fill="var(--ink-2)" font-size="13" font-family="ui-monospace,Menlo,monospace">B  −0.8</text>
+          <text x="702" y="146" fill="var(--ink-3)" font-size="12.5">÷ T, softmax</text>
+
+          <rect x="886" y="40" width="148" height="130" rx="12" fill="var(--card)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="902" y="68" font-weight="700">probabilities</text>
+          <rect x="902" y="86" width="104" height="12" rx="3" fill="var(--accent)"/>
+          <text x="902" y="114" fill="var(--ink-2)" font-size="13">billing 0.97</text>
+          <rect x="902" y="126" width="5" height="12" rx="2" fill="var(--s2)"/>
+          <text x="902" y="156" fill="var(--ink-2)" font-size="13">technical 0.03</text>
+        </g>
+        <g stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#ar)">
+          <line x1="198" y1="105" x2="232" y2="105"/><line x1="448" y1="105" x2="482" y2="105"/>
+          <line x1="648" y1="105" x2="682" y2="105"/><line x1="848" y1="105" x2="882" y2="105"/>
+        </g>
+        <text x="520" y="205" text-anchor="middle" font-size="12.5" fill="var(--ink-3)">illustrative numbers</text>
+      </svg>
+    </div>
+    <div class="grid3" style="margin-top:16px">
+      <div class="card"><h3><span lang="en">Training</span><span lang="zh">训练</span></h3><p><span lang="en">LoRA r=16 on every linear layer, including Qwen3.5's Gated-DeltaNet linear attention, merged into full weights.</span><span lang="zh">LoRA rank 16，覆盖所有线性层，包括 Qwen3.5 的 Gated-DeltaNet 线性注意力层，训完合并成完整权重。</span></p></div>
+      <div class="card"><h3><span lang="en">Loss</span><span lang="zh">损失函数</span></h3><p><span lang="en">Cross-entropy + Brier over the option letters only — the same prompt as inference.</span><span lang="zh">只看选项字母的 logit：交叉熵加 Brier。训练和推理用同一套提示词。</span></p></div>
+      <div class="card"><h3><span lang="en">Calibration</span><span lang="zh">校准</span></h3><p><span lang="en">One global temperature fitted on a held-out dev split after training (1.34 for s3).</span><span lang="zh">训练后在留出的开发集上拟合一个全局温度（s3 是 1.34）。</span></p></div>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="results">
+  <div class="wrap">
+    <h2><span lang="en">Results</span><span lang="zh">成绩</span></h2>
+    <p class="sub"><span lang="en">Two leaderboards with different philosophies. Decision Index rewards breadth across 40+ academic benchmarks; JevBench weighs accuracy, calibration, speed and cost equally.</span><span lang="zh">两个思路不同的榜单：Decision Index 考的是在 40 多个学术 benchmark 上的覆盖面；JevBench 把准确率、校准、速度和成本四项同等看待。</span></p>
+    <div class="boards">
+      <div class="card board">
+        <h3>Jev Decision Index 0.2.1 <span class="status"><span lang="en">Not merged yet · PR under review</span><span lang="zh">尚未合并 · PR 审核中</span></span></h3>
+        <div class="big">51.15 <small>ezjev-4b-s2</small></div>
+        <p><span lang="en">Score from our own full run of the frozen suite (150,759 requests, official scorer). Submitted as <a href="https://github.com/apolinario/decision-index/pull/55">apolinario/decision-index#55</a>; it appears on the <a href="https://huggingface.co/spaces/multimodalart/jev-decision-index">leaderboard</a> only after the maintainer re-checks and merges it.</span><span lang="zh">分数来自我们自己在冻结评测集上的完整评测（150,759 条请求，官方打分器）。已提交 <a href="https://github.com/apolinario/decision-index/pull/55">apolinario/decision-index#55</a>，要等维护者复核并合并后，才会出现在<a href="https://huggingface.co/spaces/multimodalart/jev-decision-index">榜单</a>上。</span></p>
+      </div>
+      <div class="card board">
+        <h3>JevBench <span class="status"><span lang="en">Queued · official run pending</span><span lang="zh">排队中 · 正式评测未出</span></span></h3>
+        <div class="big">187<small>/231</small> <small>ezjev-4b-s3</small></div>
+        <p><span lang="en">Self-test on the public items only. The official JevBench Score (Intelligence, Calibration, Speed, Cost, incl. sealed items) is measured by the maintainer; our request <a href="https://github.com/fstandhartinger/jevbench/issues/193">fstandhartinger/jevbench#193</a> has been acknowledged and is in the queue for the <a href="https://benchmarkheaven.com/jev-models">live board</a>.</span><span lang="zh">这里只是公开题的自测。正式的 JevBench 总分（准确率、校准、速度、成本四项，包括封存题）由维护者测量；我们的报名 <a href="https://github.com/fstandhartinger/jevbench/issues/193">fstandhartinger/jevbench#193</a> 已确认收到，正在排队，结果会出现在<a href="https://benchmarkheaven.com/jev-models">榜单</a>上。</span></p>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Jev Decision Index 0.2.1 · ezjev-4b-s2</h3>
+        <p style="margin-bottom:14px"><span lang="en">Would rank 9th of 70 on the 2026-09-28 board (the eight above are 26B–33B). Skill per area, 0 = chance:</span><span lang="zh">放到 2026-09-28 的榜单上，在 70 个模型里排第 9（前 8 名都是 26B 到 33B）。各领域技能分，0 = 随机水平：</span></p>
+        <div class="legend"><span><i style="background:var(--accent)"></i>ezjev-4b-s2</span><span><i style="background:var(--c2)"></i>JPT-4B</span><span><i style="background:var(--c3)"></i>Surogate Rune 26B <span lang="en">(#1)</span><span lang="zh">（榜首）</span></span></div>
+        <div class="chart" id="diChart"></div>
+        <div class="chart-foot"><span lang="en">Other models: leaderboard data (2026-09-28). ezjev: our full evaluation, not yet merged.</span><span lang="zh">其他模型的数据取自榜单（2026-09-28），ezjev 的数据取自我们的完整评测，尚未合并。</span></div>
+      </div>
+      <div class="card">
+        <h3>JevBench · ezjev-4b-s3</h3>
+        <p style="margin-bottom:14px"><span lang="en">Public items answered correctly, by tier (official <code>typesafe</code> adapter, serial requests):</span><span lang="zh">各档公开题答对的数量（官方 <code>typesafe</code> adapter，串行请求）：</span></p>
+        <div class="legend"><span><i style="background:var(--s2)"></i>ezjev-4b-s2</span><span><i style="background:var(--accent)"></i>ezjev-4b-s3</span></div>
+        <div class="chart" id="jbChart"></div>
+        <div class="tablewrap" style="margin-top:14px">
+          <table>
+            <tr><th></th><th class="num">ECE</th><th class="num">p50</th><th class="num">p95</th><th class="num"><span lang="en">$ / 1k</span><span lang="zh">每千次</span></th></tr>
+            <tr><td>s2</td><td class="num">0.059</td><td class="num">34 ms</td><td class="num">98 ms</td><td class="num">$0.027</td></tr>
+            <tr class="me"><td>s3</td><td class="num">0.044</td><td class="num">34 ms</td><td class="num">99 ms</td><td class="num">$0.027</td></tr>
+          </table>
+        </div>
+        <div class="chart-foot"><span lang="en">Raw latency on one RTX PRO 6000. Cost estimated at a $0.04/M input price, ~668 input tokens per decision.</span><span lang="zh">一张 RTX PRO 6000 上的原始延迟。成本按每百万输入 token 0.04 美元估算，平均每次决策约 668 个输入 token。</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="data">
+  <div class="wrap">
+    <h2><span lang="en">Training data</span><span lang="zh">训练数据</span></h2>
+    <p class="sub"><span lang="en">Three stages, all reproducible from the <a href="https://github.com/everettjf/ezjev">repository</a> on Hugging Face Jobs.</span><span lang="zh">一共三个阶段，都能用<a href="https://github.com/everettjf/ezjev">代码仓库</a>在 Hugging Face Jobs 上复现。</span></p>
+    <div class="grid3">
+      <div class="card"><span class="tag">stage 1 · v2</span><h3><span lang="en">Coverage</span><span lang="zh">覆盖题型</span></h3><p><span lang="en">~85k samples / 106k questions from the train splits of public datasets, matched to Decision Index task formats (ContractNLI, RAGTruth, ToolACE/Glaive, When2Call, ESCI, SGD …) plus code-generated BBH / CRUXEval / GSM8K-style items.</span><span lang="zh">约 8.5 万条样本、10.6 万个问题，来自公开数据集的 train 部分，按 Decision Index 的题型格式整理（ContractNLI、RAGTruth、ToolACE/Glaive、When2Call、ESCI、SGD……），另加代码生成的 BBH / CRUXEval / GSM8K 风格题。</span></p></div>
+      <div class="card"><span class="tag">stage 2 · s2</span><h3><span lang="en">Weak spots</span><span lang="zh">补弱项</span></h3><p><span lang="en">Low-LR pass on weak tasks (RAGTruth, ESCI, CRUXEval, MMLU, SATA, NLI4CT) plus new phishing-email and claim-verification data, with 40% replay.</span><span lang="zh">用较低学习率针对弱项再训一轮（RAGTruth、ESCI、CRUXEval、MMLU、SATA、NLI4CT），另加新写的钓鱼邮件和说法核查数据，40% 回放。</span></p></div>
+      <div class="card"><span class="tag">stage 3 · s3</span><h3><span lang="en">Long documents &amp; dates</span><span lang="zh">长文档与日期</span></h3><p><span lang="en">~20k code-generated decisions: multi-clause policies with amendments, business-day / time-zone / leap-year deadlines, pro-rating, alias → record → rule lookups, answer judging, “cannot determine” cases. Gold labels are computed by code.</span><span lang="zh">约 2 万道代码生成的决策题：带修订条款的多条件政策、营业日 / 时区 / 闰年期限、按比例计算、别名 → 主数据 → 规则的多跳查表、答案评判、“无法判断”的情况。答案都由程序算出。</span></p></div>
+    </div>
+    <div class="grid2" style="margin-top:18px">
+      <div class="card"><h3><span lang="en">Decontamination</span><span lang="zh">去重</span></h3><ul class="clean">
+        <li><span lang="en">Only train / dev splits are used; every row is checked against the full Decision Index suite (exact sentences + 13-gram overlap) and overlapping rows are dropped.</span><span lang="zh">只用 train / dev 部分；每条训练样本都和完整的 Decision Index 评测集比对（整句相同 + 13-gram 重合），重合的整条删掉。</span></li>
+        <li><span lang="en">No JevBench item — public or sealed — was used for training or checkpoint selection; the public items are used only for the self-test.</span><span lang="zh">训练和挑选模型都没用过任何 JevBench 题目（公开题和封存题都没有），公开题只用来自测。</span></li>
+      </ul></div>
+      <div class="card"><h3><span lang="en">Limits &amp; licence</span><span lang="zh">局限与授权</span></h3><ul class="clean">
+        <li><span lang="en">Weakest on knowledge-heavy tasks (GPQA, MuSR) and on multi-step date/number arithmetic inside long documents — a single forward pass can only do so much.</span><span lang="zh">最弱的是依赖知识的题（GPQA、MuSR），以及长文档里需要多步计算的日期和数字题——只做一次前向计算，能力有限。</span></li>
+        <li><span lang="en">The Qwen base is Apache-2.0, but some training sources are non-commercial (e.g. ANLI, CC BY-NC 4.0) and some have no stated licence: treat the weights as research / non-commercial unless you have checked them.</span><span lang="zh">Qwen 底座是 Apache-2.0，但部分训练数据是非商用授权（例如 ANLI 是 CC BY-NC 4.0），有些没有写明授权。在核对清楚之前，请把权重当作仅供研究和非商用。</span></li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>ezjev · <a href="https://github.com/everettjf/ezjev">GitHub</a> · <a href="https://huggingface.co/everettjf/ezjev-4b-s3">Hugging Face</a> · <a href="https://github.com/tic-top/llm2jev">llm2jev</a></div>
+    <div><span lang="en">Independent project; not affiliated with TypeSafe AI.</span><span lang="zh">独立项目，与 TypeSafe AI 无关。</span></div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // 语言：localStorage > 浏览器语言
+  var root = document.documentElement, KEY = "ezjev-lang";
+  function setLang(l) { root.setAttribute("data-lang", l); root.setAttribute("lang", l === "zh" ? "zh-CN" : "en"); try { localStorage.setItem(KEY, l); } catch (e) {} }
+  var saved = null; try { saved = localStorage.getItem(KEY); } catch (e) {}
+  setLang(saved || ((navigator.language || "").toLowerCase().indexOf("zh") === 0 ? "zh" : "en"));
+  document.getElementById("langBtn").addEventListener("click", function () { setLang(root.getAttribute("data-lang") === "zh" ? "en" : "zh"); });
+
+  // 复制按钮
+  document.querySelectorAll(".code .copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var t = b.closest(".code").querySelector("pre").innerText;
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () {
+        b.textContent = "copied"; setTimeout(function () { b.textContent = "copy"; }, 1400);
+      }, function () { b.textContent = "select"; });
+    });
+  });
+
+  // 条形图
+  function bars(el, groups, series, max) {
+    groups.forEach(function (g) {
+      var d = document.createElement("div"); d.className = "grp";
+      d.innerHTML = '<div class="glabel"><span lang="en">' + g.en + '</span><span lang="zh">' + g.zh + '</span></div>';
+      series.forEach(function (s, i) {
+        var v = g.v[i], r = document.createElement("div"); r.className = "row" + (s.me ? " me" : "");
+        r.title = s.name + ": " + (g.fmt ? g.fmt[i] : v);
+        r.innerHTML = '<div class="track"><div class="fill" style="width:' + (v / max * 100).toFixed(1) + '%;background:' + s.color + '"></div></div><div class="v">' + (g.fmt ? g.fmt[i] : v) + '</div>';
+        d.appendChild(r);
+      });
+      el.appendChild(d);
+    });
+  }
+  bars(document.getElementById("diChart"), [
+    { en: "Knowledge & reasoning", zh: "知识推理", v: [34, 29, 43] },
+    { en: "Language understanding", zh: "语言理解", v: [60, 52, 63] },
+    { en: "Retrieval & classification", zh: "检索分类", v: [56, 45, 64] },
+    { en: "Tool use", zh: "工具调用", v: [70, 57, 71] },
+    { en: "Arts & human judgment", zh: "人文判断", v: [29, 26, 42] }
+  ], [{ name: "ezjev-4b-s2", color: "var(--accent)", me: true }, { name: "JPT-4B", color: "var(--c2)" }, { name: "Surogate Rune 26B", color: "var(--c3)" }], 80);
+  bars(document.getElementById("jbChart"), [
+    { en: "easy (48)", zh: "easy（48）", v: [100, 100], fmt: ["48", "48"] },
+    { en: "original (72)", zh: "original（72）", v: [94.4, 98.6], fmt: ["68", "71"] },
+    { en: "hard (111)", zh: "hard（111）", v: [58.6, 61.3], fmt: ["65", "68"] },
+    { en: "all (231)", zh: "合计（231）", v: [78.4, 81.0], fmt: ["181", "187"] }
+  ], [{ name: "ezjev-4b-s2", color: "var(--s2)" }, { name: "ezjev-4b-s3", color: "var(--accent)", me: true }], 100);
+})();
+</script>
+</body>
+</html>
