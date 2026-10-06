@@ -1,84 +1,92 @@
 # ezjev
 
-训练一个 Jev 风格的决策模型（typed decisions：`choice` / `noul` / `score`，每个选项给一个概率），
-参加 [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 0.2.1 榜单。
+Training a Jev-style decision model (typed decisions: `choice` / `noul` / `score`, with a probability for every option)
+for the [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 0.2.1 leaderboard.
 
-项目主页：**https://xnu.app/ezjev/**（模型介绍、下载和快速上手）
+Project page: **https://xnu.app/ezjev/** (model overview, downloads and quickstart)
 
-## 结果
+## Results
 
-| 模型 | 数据 | Decision Index 0.2.1 |
+| Model | Data | Decision Index 0.2.1 |
 |---|---|---|
-| ezjev-0.8b-v1 | v1（27 个公开数据源） | 21.5（抽样估分） |
-| ezjev-0.8b-v2 | v2（按榜单题型补数据） | 31.1（抽样估分） |
-| ezjev-4b | v2 | 47.9（抽样估分） |
-| **ezjev-4b-s2** | v2 + 弱项强化 | **51.15**（完整评测，150,759 条全部完成；抽样估分 49.3） |
+| ezjev-0.8b-v1 | v1 (27 public data sources) | 21.5 (sampled estimate) |
+| ezjev-0.8b-v2 | v2 (data added to match the leaderboard's task formats) | 31.1 (sampled estimate) |
+| ezjev-4b | v2 | 47.9 (sampled estimate) |
+| **ezjev-4b-s2** | v2 + weak-spot stage | **51.15** (full run, all 150,759 requests; sampled estimate 49.3) |
 
-抽样估分 = 每个 benchmark 随机抽 50 个 case（固定种子，各模型抽到的是同一批），用官方打分器算分，误差约几分。
+Sampled estimate = 50 random cases per benchmark (fixed seed, so every model gets the same cases), scored with the official
+scorer; expect an error of a few points.
 
 ### JevBench
 
-另外报名了 [JevBench](https://benchmarkheaven.com/jev-models)（[bench request #193](https://github.com/fstandhartinger/jevbench/issues/193)），
-用的是 [ezjev-4b-s3](https://huggingface.co/everettjf/ezjev-4b-s3)；Decision Index 继续用 s2。
-JevBench 的分数是 Intelligence / Calibration / Speed / Cost 四项的调和平均，封存题只有维护者能跑。下面是公开 231 题的自测：
+We also submitted to [JevBench](https://benchmarkheaven.com/jev-models) ([bench request #193](https://github.com/fstandhartinger/jevbench/issues/193))
+with [ezjev-4b-s3](https://huggingface.co/everettjf/ezjev-4b-s3); the Decision Index entry stays on s2.
+The JevBench score is the harmonic mean of Intelligence / Calibration / Speed / Cost, and the sealed items can only be run by
+the maintainer. Self-test on the 231 public items:
 
-| 模型 | easy (48) | original (72) | hard (111) | 合计 | ECE | p50 延迟 |
+| Model | easy (48) | original (72) | hard (111) | Overall | ECE | p50 latency |
 |---|---|---|---|---|---|---|
 | ezjev-4b-s2 | 48 | 68 | 65 | 0.784 | 0.059 | 0.034 s |
 | **ezjev-4b-s3** | 48 | 71 | 68 | **0.810** | **0.044** | 0.034 s |
 
-s3 = s2 + 约 2 万条代码生成的 hard 档风格题（[`parts/gen_hard.py`](parts/gen_hard.py)：长政策文档里的多条件规则、
-营业日 / 时区 / 闰年期限、按比例退款、多跳查表、答案评判、信息不足、陷阱），再加 40% 回放，LR 5e-5。
-训练没用任何 JevBench 题目；公开题只用来自测（`jobs/launch.sh jevbench <模型仓库>`）。
+s3 = s2 + ~20k code-generated hard-tier style decisions ([`parts/gen_hard.py`](parts/gen_hard.py): multi-clause rules in long
+policy documents, business-day / time-zone / leap-year deadlines, pro-rated refunds, multi-hop lookups, answer judging,
+insufficient-information cases, traps), plus 40% replay, LR 5e-5.
+No JevBench items were used for training; the public items are only used for the self-test (`jobs/launch.sh jevbench <model repo>`).
 
-## 方案
+## Approach
 
 | | |
 |---|---|
-| 底座 | `Qwen/Qwen3.5-4B`，LoRA r=16（含 DeltaNet 线性注意力层），合并成完整权重 |
-| 提示词 / 推理 | [llm2jev](https://github.com/tic-top/llm2jev) 的 chat 格式：一次 prefill，在 `Answer:` 后读选项字母的 logprob |
-| 损失 | 选项上的交叉熵 + Brier，训练后在 dev 上拟合一个全局温度 |
-| 数据 v2 | 约 8.5 万条样本 / 10.6 万个问题：v1 的公开数据源，加上按榜单题型补的 ContractNLI、VAST、NLI4CT、RAGTruth、iSarcasmEval、ACOS、ShARC、ESCI、QNLI、SGD、ToolACE/Glaive（BFCL / API-Bank / ToolRet 三种格式）、When2Call、Humicroedit、New Yorker，以及代码生成的 BBH / CRUXEval / GSM8K / CLadder / SATA 风格题 |
-| 弱项强化（s2） | 在 ezjev-4b 上用低学习率（5e-5）再训一轮：RAGTruth、ESCI、CRUXEval、MMLU、SATA、NLI4CT，加上新的 PhishNChips 风格（真实钓鱼/正常 URL + 模板邮件）和 HoVer 风格数据，40% 回放 |
-| 去重 | 所有训练数据和评测集做整句 + 13-gram 比对，重合的整条删掉（`parts/decontam.py`） |
+| Base model | `Qwen/Qwen3.5-4B`, LoRA r=16 (including the DeltaNet linear-attention layers), merged into full weights |
+| Prompt / inference | The [llm2jev](https://github.com/tic-top/llm2jev) chat format: one prefill, then read the logprobs of the option letters after `Answer:` |
+| Loss | Cross-entropy + Brier over the options; after training, one global temperature is fitted on dev |
+| Data v2 | ~85k rows / ~106k questions: the v1 public sources, plus ContractNLI, VAST, NLI4CT, RAGTruth, iSarcasmEval, ACOS, ShARC, ESCI, QNLI, SGD, ToolACE/Glaive (in BFCL / API-Bank / ToolRet formats), When2Call, Humicroedit and New Yorker, added to match the leaderboard's task formats, and code-generated BBH / CRUXEval / GSM8K / CLadder / SATA-style items |
+| Weak-spot stage (s2) | One more pass on ezjev-4b at a low learning rate (5e-5): RAGTruth, ESCI, CRUXEval, MMLU, SATA, NLI4CT, plus new PhishNChips-style data (real phishing / benign URLs in templated emails) and HoVer-style data, with 40% replay |
+| Decontamination | All training data is checked against the evaluation suite (exact sentences + 13-grams); any overlapping row is dropped (`parts/decontam.py`) |
 
-所有来源只用 train（或 dev）部分；评测用的 split 见 decision-index kit 的 `suite/build/*.py`。
-数据源清单、授权和与评测集的关系见 [`parts/data_v2.py`](parts/data_v2.py) 里每个函数的说明。
+Only the train (or dev) split of each source is used; the splits used for evaluation are in the decision-index kit's `suite/build/*.py`.
+The list of data sources, their licences and how they relate to the evaluation sets are documented on each function in
+[`parts/data_v2.py`](parts/data_v2.py).
 
-## 在 HF Jobs 上跑（推荐）
+## Running on HF Jobs (recommended)
 
-先 `hf auth login`（write token），接受 [HLE](https://huggingface.co/datasets/cais/hle) 的使用条款，然后：
+First `hf auth login` (write token) and accept the terms of use for [HLE](https://huggingface.co/datasets/cais/hle), then:
 
 ```bash
-jobs/launch.sh suite                         # 重建评测集 → 私有 dataset（只需一次）
-jobs/launch.sh data v2                       # 构造训练数据并去重 → <你>/ezjev-data/v2
-jobs/launch.sh train                         # Qwen3.5-4B + v2 数据（A100，约 3.5 小时）
-jobs/launch.sh eval <你>/ezjev-4b 50         # 抽样估分（RTX PRO 6000，约 15 分钟）
-jobs/launch.sh eval <你>/ezjev-4b 0          # 完整评测（约 6–7 小时，中断后重跑同一命令会续跑）
+jobs/launch.sh suite                         # rebuild the evaluation suite → private dataset (once)
+jobs/launch.sh data v2                       # build training data and decontaminate → <you>/ezjev-data/v2
+jobs/launch.sh train                         # Qwen3.5-4B + v2 data (A100, ~3.5 hours)
+jobs/launch.sh eval <you>/ezjev-4b 50        # sampled estimate (RTX PRO 6000, ~15 minutes)
+jobs/launch.sh eval <you>/ezjev-4b 0         # full run (~6–7 hours; rerun the same command to resume after an interruption)
 ```
 
-JevBench 自测：`jobs/launch.sh jevbench <模型仓库>`（RTX PRO 6000，约 9 分钟，结果在 `<RESULTS_REPO>/jevbench/`）。
+JevBench self-test: `jobs/launch.sh jevbench <model repo>` (RTX PRO 6000, ~9 minutes; results go to `<RESULTS_REPO>/jevbench/`).
 
-s3：`DATA_ONLY="hard_temporal:7000,hard_policy:5000,hard_multihop:3500,hard_judge:3000,hard_trap:1500" jobs/launch.sh data v3h`，
-`EXTRA=v3h python3 tools/make_stage2.py s3 contractnli_train,sharc,ragtruth_train,gen_crux,gen_bbh 1500 0.4`，
-然后 `HF_REPO=<你>/ezjev-4b-s3 BASE_MODEL=<你>/ezjev-4b-s2 DATA_NAME=s3 LR=5e-5 jobs/launch.sh train`（A100，约 2.6 小时）。
+s3: `DATA_ONLY="hard_temporal:7000,hard_policy:5000,hard_multihop:3500,hard_judge:3000,hard_trap:1500" jobs/launch.sh data v3h`,
+`EXTRA=v3h python3 tools/make_stage2.py s3 contractnli_train,sharc,ragtruth_train,gen_crux,gen_bbh 1500 0.4`,
+then `HF_REPO=<you>/ezjev-4b-s3 BASE_MODEL=<you>/ezjev-4b-s2 DATA_NAME=s3 LR=5e-5 jobs/launch.sh train` (A100, ~2.6 hours).
 
-弱项强化：`DATA_ONLY="phish:3000,hover_like:2500" jobs/launch.sh data v2b`，
-`EXTRA=v2b python3 tools/make_stage2.py s2 <数据源,...> 3000 0.4`，
-然后 `HF_REPO=<你>/ezjev-4b-s2 BASE_MODEL=<你>/ezjev-4b DATA_NAME=s2 LR=5e-5 jobs/launch.sh train`。
+Weak-spot stage: `DATA_ONLY="phish:3000,hover_like:2500" jobs/launch.sh data v2b`,
+`EXTRA=v2b python3 tools/make_stage2.py s2 <source,...> 3000 0.4`,
+then `HF_REPO=<you>/ezjev-4b-s2 BASE_MODEL=<you>/ezjev-4b DATA_NAME=s2 LR=5e-5 jobs/launch.sh train`.
 
-这次全部流程（含 0.8B 对比测试）在 HF Jobs 上一共花了约 45 美元。
+The whole Decision Index pipeline (including the 0.8B comparison runs) cost about $45 on HF Jobs.
 
-## 在 Colab 上跑
+## Running on Colab
 
-[`notebooks/ezjev_train_colab.ipynb`](notebooks/ezjev_train_colab.ipynb) 和 [`notebooks/ezjev_eval_colab.ipynb`](notebooks/ezjev_eval_colab.ipynb)
-用的是 v1 数据（`DATA_VERSION = 1`），A100 上训练约 3 小时，完整评测约 5–8 小时。v2 数据要用 HF Jobs 构造（需要和私有评测集去重）。
+[`notebooks/ezjev_train_colab.ipynb`](notebooks/ezjev_train_colab.ipynb) and [`notebooks/ezjev_eval_colab.ipynb`](notebooks/ezjev_eval_colab.ipynb)
+use the v1 data (`DATA_VERSION = 1`): training takes ~3 hours on an A100, a full evaluation ~5–8 hours. The v2 data has to be built
+on HF Jobs (it needs decontamination against the private evaluation suite).
 
-改代码时只改 `parts/`，然后运行 `python3 tools/build.py` 重新生成 notebook 和 `jobs/train_job.py`、`jobs/data_job.py`。
+When changing code, only edit `parts/`, then run `python3 tools/build.py` to regenerate the notebooks and `jobs/train_job.py` / `jobs/data_job.py`.
 
-## 注意
+## Notes
 
-- 不能用评测集训练，也不能再发布评测集（规则和数据授权都禁止）。评测用 `--compact` 保存结果，不包含题目原文。
-- 部分训练数据的授权是非商用的（例如 ANLI 是 CC BY-NC 4.0），VAST、NLI4CT、ACOS、Humicroedit 没有写明授权；训练出的权重如果要商用，请先核对授权。
-- 代码采用 [MIT 协议](LICENSE)。MIT 只覆盖本仓库的代码，不覆盖训练数据和模型权重：权重仍受上一条所说的数据授权约束。
-- 本项目与 TypeSafe AI 无关。
+- Do not train on the evaluation suite, and do not redistribute it (both the rules and the data licences forbid it). Evaluations
+  save results with `--compact`, which leaves out the item text.
+- Some training data is licensed for non-commercial use only (e.g. ANLI is CC BY-NC 4.0), and VAST, NLI4CT, ACOS and Humicroedit
+  state no licence; check the licences before using the trained weights commercially.
+- The code is under the [MIT License](LICENSE). MIT covers only the code in this repository, not the training data or the model
+  weights: the weights remain subject to the data licences above.
+- This project is not affiliated with TypeSafe AI.
