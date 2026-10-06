@@ -1,9 +1,19 @@
 # ezjev
 
-Training a Jev-style decision model (typed decisions: `choice` / `noul` / `score`, with a probability for every option)
-for the [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 0.2.1 leaderboard.
+Training a Jev-style decision model (typed decisions: `choice` / `noul` / `score`, with a probability for every option),
+submitted to two leaderboards: [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 0.2.1
+and [JevBench](https://benchmarkheaven.com/jev-models).
 
 Project page: **https://xnu.app/ezjev/** (model overview, downloads and quickstart)
+
+## Leaderboard submissions
+
+Both submissions have been made; neither is on the public board yet.
+
+| Leaderboard | Model | Submission | Status (2026-10-06) |
+|---|---|---|---|
+| Jev Decision Index 0.2.1 | [ezjev-4b-s2](https://huggingface.co/everettjf/ezjev-4b-s2) | PR [apolinario/decision-index#55](https://github.com/apolinario/decision-index/pull/55) with our full run (51.15) | Open, waiting for the maintainer to re-check and merge |
+| JevBench | [ezjev-4b-s3](https://huggingface.co/everettjf/ezjev-4b-s3) | Bench request [fstandhartinger/jevbench#193](https://github.com/fstandhartinger/jevbench/issues/193) | Acknowledged by the maintainer; in the free measurement queue. The official score (incl. sealed items) is measured by the maintainer |
 
 ## Results
 
