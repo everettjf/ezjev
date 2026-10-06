@@ -80,4 +80,5 @@ s3：`DATA_ONLY="hard_temporal:7000,hard_policy:5000,hard_multihop:3500,hard_jud
 
 - 不能用评测集训练，也不能再发布评测集（规则和数据授权都禁止）。评测用 `--compact` 保存结果，不包含题目原文。
 - 部分训练数据的授权是非商用的（例如 ANLI 是 CC BY-NC 4.0），VAST、NLI4CT、ACOS、Humicroedit 没有写明授权；训练出的权重如果要商用，请先核对授权。
+- 代码采用 [MIT 协议](LICENSE)。MIT 只覆盖本仓库的代码，不覆盖训练数据和模型权重：权重仍受上一条所说的数据授权约束。
 - 本项目与 TypeSafe AI 无关。
