@@ -1,21 +1,38 @@
 # ezjev
 
 Training a Jev-style decision model (typed decisions: `choice` / `noul` / `score`, with a probability for every option),
-submitted to two leaderboards: [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 0.2.1
+submitted to two leaderboards: [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index)
 and [JevBench](https://benchmarkheaven.com/jev-models).
 
 Project page: **https://xnu.app/ezjev/** (model overview, downloads and quickstart)
 
 ## Leaderboard submissions
 
-Both submissions have been made; neither is on the public board yet.
-
 | Leaderboard | Model | Submission | Status (2026-10-06) |
 |---|---|---|---|
-| Jev Decision Index 0.2.1 | [ezjev-4b-s2](https://huggingface.co/everettjf/ezjev-4b-s2) | PR [apolinario/decision-index#55](https://github.com/apolinario/decision-index/pull/55) with our full run (51.15) | Open, waiting for the maintainer to re-check and merge |
+| Jev Decision Index | [ezjev-4b-s2](https://huggingface.co/everettjf/ezjev-4b-s2) | PR [apolinario/decision-index#55](https://github.com/apolinario/decision-index/pull/55) | **Listed in Decision Index 0.3** (2026-10-06): Full score **46.95**, #35 of 111 (tied group from #31), **best of all models ≤ 5B** |
 | JevBench | [ezjev-4b-s3](https://huggingface.co/everettjf/ezjev-4b-s3) | Bench request [fstandhartinger/jevbench#193](https://github.com/fstandhartinger/jevbench/issues/193) | Acknowledged by the maintainer; in the free measurement queue. The official score (incl. sealed items) is measured by the maintainer |
 
-## Results
+### Decision Index 0.3 (official)
+
+Decision Index 0.3 changed the scoring: the Full score is 20% public benchmarks, 50% private tests of the same skills and
+30% private tasks from new domains. The private parts are never published, so nobody can train on them.
+
+| Model | Full score | Public (37 benchmarks) | Private, same skills | Private, new domains | Rank (of 111) |
+|---|---|---|---|---|---|
+| Jev 1.13.0 (TypeSafe) | 60.11 | 57.96 | 58.04 | 54.98 | #3 |
+| **ezjev-4b-s2** | **46.95** | **50.82** | **46.22** | **40.73** | **#35** |
+| vLLM-SR Decision 2.0 Nox 4B | 44.95 | 44.21 | 43.72 | 42.19 | #38 |
+| jiwo 4B | 42.86 | 45.76 | 46.05 | 33.32 | #42 |
+| Hopper (G) 1.2 | 42.61 | 41.15 | 42.37 | 39.61 | #43 |
+| JPT-4B | 41.63 | 42.82 | 40.11 | 39.17 | #46 |
+
+Every model ranked above ezjev-4b-s2 has at least 9B parameters. The score is lower than our 0.2.1 estimate (51.15): on the
+public benchmarks we keep 50.82, but the private same-skill tests (46.22) and especially the new-domain tasks (40.73) show
+that part of the gain from matching the public task formats does not transfer. Per area (public, skill score): knowledge 31.0,
+language 60.5, retrieval 56.3, tools 69.9, arts 31.1. Source: the leaderboard's `data/index.json` (generated 2026-10-06).
+
+## Development results (Decision Index 0.2.1, our own runs)
 
 | Model | Data | Decision Index 0.2.1 |
 |---|---|---|

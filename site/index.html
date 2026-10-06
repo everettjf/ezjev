@@ -6,7 +6,7 @@
 <title>ezjev — calibrated typed decisions from a 4B model</title>
 <meta name="description" content="ezjev is an open 4B typed-decision model (Jev-style /v1/systemone): choice, noul and score questions answered with calibrated per-option probabilities from one forward pass.">
 <meta property="og:title" content="ezjev — calibrated typed decisions from a 4B model">
-<meta property="og:description" content="Open 4B decision model: per-option probabilities from one prefill, ~34 ms p50. Decision Index 0.2.1: 51.15. JevBench public self-test: 187/231.">
+<meta property="og:description" content="Open 4B decision model: per-option probabilities from one prefill, ~34 ms p50. Decision Index 0.3: 46.95, best model ≤ 5B. JevBench public self-test: 187/231.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232a78d6'/%3E%3Cpath d='M18 34l9 9 19-21' stroke='white' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root {
@@ -167,6 +167,8 @@ tr.me td { font-weight: 700; }
 .status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
           background: color-mix(in srgb, #eda100 18%, var(--card)); color: var(--ink); border: 1px solid color-mix(in srgb, #eda100 45%, var(--line)); }
 .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #eda100; }
+.status.ok { background: color-mix(in srgb, #1baf7a 16%, var(--card)); border-color: color-mix(in srgb, #1baf7a 45%, var(--line)); }
+.status.ok::before { background: #1baf7a; }
 .stat .status { margin-top: 8px; font-size: 11.5px; padding: 2px 8px; }
 .boards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
 @media (max-width: 860px) { .boards { grid-template-columns: 1fr; } }
@@ -244,7 +246,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
     </div>
 
     <div class="stats">
-      <div class="stat"><div class="num">51.15</div><div class="lbl"><span lang="en">Jev Decision Index 0.2.1, full run (ezjev-4b-s2)</span><span lang="zh">Jev Decision Index 0.2.1 完整评测（ezjev-4b-s2）</span></div><span class="status"><span lang="en">listing pending</span><span lang="zh">上榜待审核</span></span></div>
+      <div class="stat"><div class="num">46.95</div><div class="lbl"><span lang="en">Decision Index 0.3 Full score — best of all models ≤ 5B (ezjev-4b-s2)</span><span lang="zh">Decision Index 0.3 总分——5B 以下所有模型中第一（ezjev-4b-s2）</span></div><span class="status ok"><span lang="en">official · #35 of 111</span><span lang="zh">正式成绩 · 111 个中第 35</span></span></div>
       <div class="stat"><div class="num">187<small>/231</small></div><div class="lbl"><span lang="en">JevBench public items, self-test (ezjev-4b-s3)</span><span lang="zh">JevBench 公开题自测（ezjev-4b-s3）</span></div><span class="status"><span lang="en">official run queued</span><span lang="zh">正式评测排队中</span></span></div>
       <div class="stat"><div class="num">34<small>ms</small></div><div class="lbl"><span lang="en">p50 latency per decision, one RTX PRO 6000</span><span lang="zh">单次决策 p50 延迟，一张 RTX PRO 6000</span></div></div>
       <div class="stat"><div class="num">0.044</div><div class="lbl"><span lang="en">Expected calibration error on JevBench public items</span><span lang="zh">JevBench 公开题上的校准误差（ECE）</span></div></div>
@@ -255,13 +257,13 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
 <section id="leaderboards">
   <div class="wrap">
     <h2><span lang="en">Leaderboard submissions</span><span lang="zh">榜单提交</span></h2>
-    <p class="sub"><span lang="en">ezjev has been submitted to two leaderboards. Neither entry is on the public board yet — status as of 2026-10-06.</span><span lang="zh">ezjev 已经提交到两个榜单，目前都还没出现在公开榜单上——以下是 2026-10-06 的状态。</span></p>
+    <p class="sub"><span lang="en">ezjev has been submitted to two leaderboards. Decision Index has published its result; JevBench is still in the queue — status as of 2026-10-06.</span><span lang="zh">ezjev 已经提交到两个榜单。Decision Index 已经公布成绩，JevBench 还在排队——以下是 2026-10-06 的状态。</span></p>
     <div class="boards">
       <div class="card board">
-        <h3>Jev Decision Index 0.2.1 <span class="status"><span lang="en">Not merged yet · PR under review</span><span lang="zh">尚未合并 · PR 审核中</span></span></h3>
-        <div class="big">51.15 <small>ezjev-4b-s2</small></div>
-        <p style="margin:0 0 8px;color:var(--ink-3)"><span lang="en">Submitted 2026-10-04 · model ezjev-4b-s2</span><span lang="zh">2026-10-04 提交 · 模型 ezjev-4b-s2</span></p>
-        <p><span lang="en">Score from our own full run of the frozen suite (150,759 requests, official scorer). Submitted as <a href="https://github.com/apolinario/decision-index/pull/55">apolinario/decision-index#55</a>; it appears on the <a href="https://huggingface.co/spaces/multimodalart/jev-decision-index">leaderboard</a> only after the maintainer re-checks and merges it.</span><span lang="zh">分数来自我们自己在冻结评测集上的完整评测（150,759 条请求，官方打分器）。已提交 <a href="https://github.com/apolinario/decision-index/pull/55">apolinario/decision-index#55</a>，要等维护者复核并合并后，才会出现在<a href="https://huggingface.co/spaces/multimodalart/jev-decision-index">榜单</a>上。</span></p>
+        <h3>Jev Decision Index 0.3 <span class="status ok"><span lang="en">Listed · official result</span><span lang="zh">已上榜 · 正式成绩</span></span></h3>
+        <div class="big">46.95 <small>ezjev-4b-s2</small></div>
+        <p style="margin:0 0 8px;color:var(--ink-3)"><span lang="en">Submitted 2026-10-04 (PR #55) · listed 2026-10-06 · #35 of 111</span><span lang="zh">2026-10-04 提交（PR #55）· 2026-10-06 上榜 · 111 个中第 35</span></p>
+        <p><span lang="en"><b>Best of all models ≤ 5B</b> — every entry ranked above it has at least 9B parameters. Decision Index 0.3 scores 20% public benchmarks (ezjev: 50.82), 50% private tests of the same skills (46.22) and 30% private tasks from new domains (40.73), so most of the score comes from tests nobody can train on. See the <a href="https://huggingface.co/spaces/multimodalart/jev-decision-index">leaderboard</a>.</span><span lang="zh"><b>在 5B 以下的所有模型中排第一</b>——排在它前面的模型都至少有 9B 参数。Decision Index 0.3 的总分由三部分组成：20% 公开 benchmark（ezjev 50.82）、50% 同类技能的私有测试（46.22）、30% 新领域的私有任务（40.73），大部分分数来自谁都没法拿来训练的题。详见<a href="https://huggingface.co/spaces/multimodalart/jev-decision-index">榜单</a>。</span></p>
       </div>
       <div class="card board">
         <h3>JevBench <span class="status"><span lang="en">Queued · official run pending</span><span lang="zh">排队中 · 正式评测未出</span></span></h3>
@@ -307,11 +309,11 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
       </div>
       <div class="card model">
         <div class="name">ezjev-4b-s2</div>
-        <p><span lang="en">The checkpoint behind the full Jev Decision Index 0.2.1 run (51.15).</span><span lang="zh">Jev Decision Index 0.2.1 完整评测（51.15）用的就是这个版本。</span></p>
+        <p><span lang="en">The checkpoint listed on Jev Decision Index 0.3 — the best model ≤ 5B on that board.</span><span lang="zh">上榜 Jev Decision Index 0.3 的版本，是该榜单上 5B 以下最好的模型。</span></p>
         <dl class="kv">
           <dt><span lang="en">Revision</span><span lang="zh">版本</span></dt><dd class="mono">3d77eb1</dd>
           <dt><span lang="en">Temperature</span><span lang="zh">温度</span></dt><dd class="mono">1.26</dd>
-          <dt>Decision Index</dt><dd><span lang="en">51.15 · full 150,759-request run</span><span lang="zh">51.15 · 150,759 条完整评测</span></dd>
+          <dt>Decision Index</dt><dd><span lang="en">0.3: 46.95 (#35 of 111)</span><span lang="zh">0.3：46.95（111 个中第 35）</span></dd>
         </dl>
         <div class="code"><div class="bar">shell<button class="copy" type="button">copy</button></div><pre>hf download everettjf/ezjev-4b-s2 --local-dir ezjev-4b-s2</pre></div>
         <div class="actions">
@@ -494,14 +496,14 @@ llm2jev --model ./ezjev-4b-s3 --served-model-name ezjev-4b-s3 --backend vllm \
 <section class="alt" id="results">
   <div class="wrap">
     <h2><span lang="en">Results</span><span lang="zh">成绩</span></h2>
-    <p class="sub"><span lang="en">Submission status is <a href="#leaderboards">above</a>. Two leaderboards with different philosophies. Decision Index rewards breadth across 40+ academic benchmarks; JevBench weighs accuracy, calibration, speed and cost equally.</span><span lang="zh">提交状态见<a href="#leaderboards">上方</a>。两个思路不同的榜单：Decision Index 考的是在 40 多个学术 benchmark 上的覆盖面；JevBench 把准确率、校准、速度和成本四项同等看待。</span></p>
+    <p class="sub"><span lang="en">Submission status is <a href="#leaderboards">above</a>. Two leaderboards with different philosophies. Decision Index rewards breadth (37 public benchmarks plus private tests of the same skills and new domains); JevBench weighs accuracy, calibration, speed and cost equally.</span><span lang="zh">提交状态见<a href="#leaderboards">上方</a>。两个思路不同的榜单：Decision Index 考的是覆盖面（37 个公开 benchmark，加上同类技能和新领域的私有测试）；JevBench 把准确率、校准、速度和成本四项同等看待。</span></p>
     <div class="grid2">
       <div class="card">
-        <h3>Jev Decision Index 0.2.1 · ezjev-4b-s2</h3>
-        <p style="margin-bottom:14px"><span lang="en">Would rank 9th of 70 on the 2026-09-28 board (the eight above are 26B–33B). Skill per area, 0 = chance:</span><span lang="zh">放到 2026-09-28 的榜单上，在 70 个模型里排第 9（前 8 名都是 26B 到 33B）。各领域技能分，0 = 随机水平：</span></p>
-        <div class="legend"><span><i style="background:var(--accent)"></i>ezjev-4b-s2</span><span><i style="background:var(--c2)"></i>JPT-4B</span><span><i style="background:var(--c3)"></i>Surogate Rune 26B <span lang="en">(#1)</span><span lang="zh">（榜首）</span></span></div>
+        <h3>Jev Decision Index 0.3 · ezjev-4b-s2</h3>
+        <p style="margin-bottom:14px"><span lang="en">Official result, compared with the next-best 4B entry and with Jev itself. Skill scores, 0 = chance:</span><span lang="zh">正式成绩，与第二好的 4B 模型以及 Jev 本身对比。技能分，0 = 随机水平：</span></p>
+        <div class="legend"><span><i style="background:var(--accent)"></i>ezjev-4b-s2 <span lang="en">(#35)</span><span lang="zh">（第 35）</span></span><span><i style="background:var(--c2)"></i>vLLM-SR Nox 4B <span lang="en">(#38)</span><span lang="zh">（第 38）</span></span><span><i style="background:var(--c3)"></i>Jev 1.13.0 <span lang="en">(#3)</span><span lang="zh">（第 3）</span></span></div>
         <div class="chart" id="diChart"></div>
-        <div class="chart-foot"><span lang="en">Other models: leaderboard data (2026-09-28). ezjev: our full evaluation, not yet merged.</span><span lang="zh">其他模型的数据取自榜单（2026-09-28），ezjev 的数据取自我们的完整评测，尚未合并。</span></div>
+        <div class="chart-foot"><span lang="en">Source: the leaderboard's data/index.json, generated 2026-10-06. On our own 0.2.1 run (public suite only) the same checkpoint scored 51.15.</span><span lang="zh">数据来源：榜单的 data/index.json（2026-10-06 生成）。同一个模型在我们自己跑的 0.2.1（只有公开题）上是 51.15。</span></div>
       </div>
       <div class="card">
         <h3>JevBench · ezjev-4b-s3</h3>
@@ -536,7 +538,7 @@ llm2jev --model ./ezjev-4b-s3 --served-model-name ezjev-4b-s3 --backend vllm \
         <li><span lang="en">No JevBench item — public or sealed — was used for training or checkpoint selection; the public items are used only for the self-test.</span><span lang="zh">训练和挑选模型都没用过任何 JevBench 题目（公开题和封存题都没有），公开题只用来自测。</span></li>
       </ul></div>
       <div class="card"><h3><span lang="en">Limits &amp; licence</span><span lang="zh">局限与授权</span></h3><ul class="clean">
-        <li><span lang="en">Weakest on knowledge-heavy tasks (GPQA, MuSR) and on multi-step date/number arithmetic inside long documents — a single forward pass can only do so much.</span><span lang="zh">最弱的是依赖知识的题（GPQA、MuSR），以及长文档里需要多步计算的日期和数字题——只做一次前向计算，能力有限。</span></li>
+        <li><span lang="en">Weakest on knowledge-heavy tasks (GPQA, MuSR), on multi-step date/number arithmetic inside long documents — a single forward pass can only do so much — and on unseen domains: on Decision Index 0.3 the private new-domain score (40.73) is 10 points below the public one (50.82).</span><span lang="zh">最弱的是依赖知识的题（GPQA、MuSR）、长文档里需要多步计算的日期和数字题（只做一次前向计算，能力有限），以及没见过的领域：在 Decision Index 0.3 上，私有新领域得分（40.73）比公开题（50.82）低 10 分。</span></li>
         <li><span lang="en">The Qwen base is Apache-2.0, but some training sources are non-commercial (e.g. ANLI, CC BY-NC 4.0) and some have no stated licence: treat the weights as research / non-commercial unless you have checked them.</span><span lang="zh">Qwen 底座是 Apache-2.0，但部分训练数据是非商用授权（例如 ANLI 是 CC BY-NC 4.0），有些没有写明授权。在核对清楚之前，请把权重当作仅供研究和非商用。</span></li>
       </ul></div>
     </div>
@@ -584,12 +586,11 @@ llm2jev --model ./ezjev-4b-s3 --served-model-name ezjev-4b-s3 --backend vllm \
     });
   }
   bars(document.getElementById("diChart"), [
-    { en: "Knowledge & reasoning", zh: "知识推理", v: [34, 29, 43] },
-    { en: "Language understanding", zh: "语言理解", v: [60, 52, 63] },
-    { en: "Retrieval & classification", zh: "检索分类", v: [56, 45, 64] },
-    { en: "Tool use", zh: "工具调用", v: [70, 57, 71] },
-    { en: "Arts & human judgment", zh: "人文判断", v: [29, 26, 42] }
-  ], [{ name: "ezjev-4b-s2", color: "var(--accent)", me: true }, { name: "JPT-4B", color: "var(--c2)" }, { name: "Surogate Rune 26B", color: "var(--c3)" }], 80);
+    { en: "Full score (20% public · 50% same skills · 30% new domains)", zh: "总分（20% 公开 · 50% 同类技能 · 30% 新领域）", v: [46.95, 44.95, 60.11] },
+    { en: "Public benchmarks (37)", zh: "公开 benchmark（37 个）", v: [50.82, 44.21, 57.96] },
+    { en: "Private: same skills", zh: "私有：同类技能", v: [46.22, 43.72, 58.04] },
+    { en: "Private: new domains", zh: "私有：新领域", v: [40.73, 42.19, 54.98] }
+  ], [{ name: "ezjev-4b-s2", color: "var(--accent)", me: true }, { name: "vLLM-SR Nox 4B", color: "var(--c2)" }, { name: "Jev 1.13.0", color: "var(--c3)" }], 70);
   bars(document.getElementById("jbChart"), [
     { en: "easy (48)", zh: "easy（48）", v: [100, 100], fmt: ["48", "48"] },
     { en: "original (72)", zh: "original（72）", v: [94.4, 98.6], fmt: ["68", "71"] },
