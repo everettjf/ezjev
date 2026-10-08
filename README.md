@@ -8,10 +8,10 @@ Project page: **https://xnu.app/ezjev/** (model overview, downloads and quicksta
 
 ## Leaderboard submissions
 
-| Leaderboard | Model | Submission | Status (2026-10-06) |
+| Leaderboard | Model | Submission | Status (2026-10-07) |
 |---|---|---|---|
 | Jev Decision Index | [ezjev-4b-s2](https://huggingface.co/everettjf/ezjev-4b-s2) | PR [apolinario/decision-index#55](https://github.com/apolinario/decision-index/pull/55) | **Listed in Decision Index 0.3** (2026-10-06): Full score **46.95**, #35 of 111 (tied group from #31), **best of all models ≤ 5B** |
-| JevBench | [ezjev-4b-s3](https://huggingface.co/everettjf/ezjev-4b-s3) | Bench request [fstandhartinger/jevbench#193](https://github.com/fstandhartinger/jevbench/issues/193) | Acknowledged by the maintainer; in the free measurement queue. The official score (incl. sealed items) is measured by the maintainer |
+| JevBench | [ezjev-4b-s3](https://huggingface.co/everettjf/ezjev-4b-s3) | Submitted 2026-10-07 via [benchmarkheaven.com/submit](https://benchmarkheaven.com/submit) (reference 7B97B020). The earlier GitHub request [#193](https://github.com/fstandhartinger/jevbench/issues/193) was closed at the maintainer's request | In the free regular queue (position #32 at submission). The official score (incl. sealed items) is measured by the maintainer |
 
 ### Decision Index 0.3 (official)
 
@@ -46,7 +46,7 @@ scorer; expect an error of a few points.
 
 ### JevBench
 
-We also submitted to [JevBench](https://benchmarkheaven.com/jev-models) ([bench request #193](https://github.com/fstandhartinger/jevbench/issues/193))
+We also submitted to [JevBench](https://benchmarkheaven.com/jev-models) (via the [submission form](https://benchmarkheaven.com/submit), reference 7B97B020)
 with [ezjev-4b-s3](https://huggingface.co/everettjf/ezjev-4b-s3); the Decision Index entry stays on s2.
 The JevBench score is the harmonic mean of Intelligence / Calibration / Speed / Cost, and the sealed items can only be run by
 the maintainer. Self-test on the 231 public items:
