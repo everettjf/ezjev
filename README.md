@@ -98,7 +98,7 @@ Weak-spot stage: `DATA_ONLY="phish:3000,hover_like:2500" jobs/launch.sh data v2b
 `EXTRA=v2b python3 tools/make_stage2.py s2 <source,...> 3000 0.4`,
 then `HF_REPO=<you>/ezjev-4b-s2 BASE_MODEL=<you>/ezjev-4b DATA_NAME=s2 LR=5e-5 jobs/launch.sh train`.
 
-The whole Decision Index pipeline (including the 0.8B comparison runs) cost about $45 on HF Jobs.
+Total HF Jobs cost was about $41: about $33.7 for the Decision Index pipeline (including the 0.8B comparison runs and the full evaluation) and about $7.4 for the JevBench round (s3 data, training and two self-tests). Each figure is job runtime × the hourly price.
 
 ## Running on Colab
 
