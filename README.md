@@ -4,7 +4,7 @@ Training a Jev-style decision model (typed decisions: `choice` / `noul` / `score
 submitted to two leaderboards: [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index)
 and [JevBench](https://benchmarkheaven.com/jev-models).
 
-Project page: **https://xnu.app/ezjev/** (model overview, downloads and quickstart)
+Project page: **https://atomsprout.com/ezjev/** (model overview, downloads and quickstart)
 
 ## Leaderboard submissions
 
